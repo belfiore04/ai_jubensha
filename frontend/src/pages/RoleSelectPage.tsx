@@ -13,15 +13,13 @@ export default function RoleSelectPage() {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
   const roles = state.session?.script?.roles ?? [];
-  const isGenerating = state.phase === "generating";
+  const isGenerating = state.session?.phase === "generating";
 
   // Pick a random default character for the player (first one)
   const playerCharacterId = PLATFORM_CHARACTERS[0].id;
 
   function handleStart() {
     if (!selectedRoleId || !state.gameId) return;
-
-    dispatch({ type: "SET_PLAYER_CHARACTER", payload: playerCharacterId });
 
     // Fire-and-forget: start game in background, navigate immediately
     // GameRoom will pick up messages via SSE as they arrive

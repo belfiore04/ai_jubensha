@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-import uuid
 from typing import Any
 
 from app.engine.character_agent import CharacterAgent
@@ -20,6 +19,7 @@ from app.models.game import (
     GameSession,
     MessageType,
     ScriptStyle,
+    uid,
 )
 
 # ── fixed platform characters ─────────────────────────
@@ -72,10 +72,6 @@ def _debug(game_id: str, msg: str) -> None:
         q.put_nowait({"ts": _t.time(), "msg": msg})
 
 
-def _uid() -> str:
-    return uuid.uuid4().hex[:12]
-
-
 def _now() -> float:
     return time.time()
 
@@ -96,7 +92,7 @@ def _make_msg(
     **kwargs: Any,
 ) -> ChatMessage:
     return ChatMessage(
-        id=_uid(),
+        id=uid(),
         type=msg_type,
         sender_id=sender_id,
         sender_name=sender_name,
@@ -124,40 +120,48 @@ class GameEngine:
     def _get_agent(self, character_id: str) -> CharacterAgent:
         return CharacterAgent(character_id, llm=self.llm)
 
-    async def _ai_characters_discuss(
-        self, session: GameSession, context_hint: str
+    # ── discussion ────────────────────────────────────
+
+    async def run_discussion_round(
+        self, session: GameSession, clue_context: str, discussion_history: list[ChatMessage],
     ) -> list[ChatMessage]:
-        """Let all AI characters each say one line about the current situation."""
-        messages: list[ChatMessage] = []
-        ai_char_ids = [
-            m.character_id for m in session.mappings if not m.is_player
+        """Run one round of AI discussion: all AI characters speak concurrently."""
+        ai_chars = [
+            (m.character_id, next((c.name for c in session.characters if c.id == m.character_id), m.character_id))
+            for m in session.mappings if not m.is_player
         ]
-        for cid in ai_char_ids:
+
+        async def _one_response(cid: str) -> tuple[str, str]:
             agent = self._get_agent(cid)
-            # Find character name
-            char_name = cid
-            for c in session.characters:
-                if c.id == cid:
-                    char_name = c.name
-                    break
-            try:
-                text = await agent.respond(session.messages, session)
-                msg = _make_msg(
-                    text,
-                    MessageType.CHARACTER_SPEAK,
-                    sender_id=cid,
-                    sender_name=char_name,
-                )
-                _push(session, msg)
-                messages.append(msg)
-            except Exception:
-                pass
-        return messages
+            text = await agent.respond(
+                context=discussion_history,
+                game_state=session,
+                mode="discuss",
+                clue_context=clue_context,
+            )
+            return cid, text
+
+        # Fire all AI characters concurrently
+        results = await asyncio.gather(*[_one_response(cid) for cid, _ in ai_chars])
+
+        round_msgs: list[ChatMessage] = []
+        for cid, text in results:
+            char_name = next((n for c, n in ai_chars if c == cid), cid)
+            msg = _make_msg(
+                text,
+                MessageType.CHARACTER_SPEAK,
+                sender_id=cid,
+                sender_name=char_name,
+            )
+            _push(session, msg)
+            round_msgs.append(msg)
+
+        return round_msgs
 
     # ── lifecycle ──────────────────────────────────────
 
     def create_game(self) -> GameSession:
-        gid = uuid.uuid4().hex
+        gid = uid() + uid()
         session = GameSession(id=gid)
         _store[gid] = session
         _message_queues[gid] = asyncio.Queue()
@@ -438,6 +442,8 @@ class GameEngine:
                     explanation = q.explanation
                     break
 
+        session.act_answered += 1
+
         if correct:
             session.score += 10
             resp = _make_msg(
@@ -489,29 +495,11 @@ class GameEngine:
         if not current:
             return []
 
-        # Count answers for CURRENT act only:
-        # Each choice message in the buffer is followed by a "回答正确/错误" system message.
-        # Count how many answer-result messages appeared AFTER the current act started.
-        # We find the act's first choice message index, then count answers after it.
-        current_act_choices = len(current.choices)
+        total_choices = len(current.choices)
 
-        # Find where current act's content starts in messages
-        act_marker = f"第{session.current_act}幕" if session.current_act > 1 else "第一幕"
-        act_start_idx = 0
-        for i, m in enumerate(session.messages):
-            if m.type == MessageType.DM_NARRATION and act_marker in m.content:
-                act_start_idx = i
-                break
-
-        # Count answers after act_start_idx
-        act_answered = 0
-        for m in session.messages[act_start_idx:]:
-            if m.type == MessageType.SYSTEM and ("回答正确" in m.content or "回答错误" in m.content):
-                act_answered += 1
-
-        if act_answered < current_act_choices:
+        if session.act_answered < total_choices:
             # Still have unanswered questions in this act — present next one
-            choice_msg = self.dm.present_choice(current, act_answered)
+            choice_msg = self.dm.present_choice(current, session.act_answered)
             if choice_msg:
                 _push(session, choice_msg)
                 return [choice_msg]
@@ -519,7 +507,7 @@ class GameEngine:
 
         # current act fully answered → advance
         result: list[ChatMessage] = []
-        _debug(session.id, f"📊 第{session.current_act}幕完成(answered={act_answered}/{current_act_choices}), 推进中...")
+        _debug(session.id, f"📊 第{session.current_act}幕完成(answered={session.act_answered}/{total_choices}), 推进中...")
 
         if session.current_act < 3:
             next_act_num = session.current_act + 1
@@ -559,19 +547,13 @@ class GameEngine:
 
             if next_act:
                 session.current_act = next_act_num
+                session.act_answered = 0
                 session.phase = next_phase
 
-                # Notify user we're entering next act
-                entering_msg = _make_msg(
-                    f"⏳ 正在进入第{next_act_num}幕...",
-                    MessageType.SYSTEM,
-                )
-                _push(session, entering_msg)
-                result.append(entering_msg)
-
-                narration = await self.dm.narrate(next_phase, next_act, session)
+                # Use the narration already generated by generate_act (no extra LLM call)
+                act_label = {2: "二", 3: "三"}.get(next_act_num, str(next_act_num))
                 narr_msg = _make_msg(
-                    narration,
+                    f"【第{act_label}幕：{next_act.title}】\n{next_act.narration}",
                     MessageType.DM_NARRATION,
                     sender_id="dm",
                     sender_name="DM",

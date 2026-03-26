@@ -18,7 +18,7 @@ export default function EndingPage() {
   const murdererMapping = state.session?.mappings.find(
     (m) => m.role_id === script?.murderer_role_id
   );
-  const murdererCharacter = state.characters.find(
+  const murdererCharacter = (state.session?.characters ?? []).find(
     (c) => c.id === murdererMapping?.character_id
   );
 

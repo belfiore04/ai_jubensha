@@ -1,9 +1,15 @@
 """Game data models."""
 from __future__ import annotations
 
+import uuid
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
+
+
+def uid() -> str:
+    """Generate a short unique id, shared across all modules."""
+    return uuid.uuid4().hex[:12]
 
 
 # ── Enums ──────────────────────────────────────────────
@@ -139,5 +145,6 @@ class GameSession(BaseModel):
     script: Optional[Script] = None
     messages: list[ChatMessage] = Field(default_factory=list)
     current_act: int = 0
+    act_answered: int = 0  # choices answered in current act
     score: int = 0
     player_character_id: str = ""

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import uuid
 from typing import Any
 
 from langfuse import observe
@@ -17,6 +16,7 @@ from app.models.game import (
     RoleAlignment,
     Script,
     ScriptStyle,
+    uid,
 )
 
 STYLE_LABELS: dict[ScriptStyle, str] = {
@@ -30,10 +30,6 @@ STYLE_LABELS: dict[ScriptStyle, str] = {
 }
 
 # ── helpers ────────────────────────────────────────────
-
-def _uid() -> str:
-    return uuid.uuid4().hex[:12]
-
 
 def _strip_thinking(raw: str) -> str:
     """Remove <think>...</think> blocks from M2.7 responses."""
@@ -144,6 +140,7 @@ async def generate_outline(
                 user_prompt=_outline_user_prompt(style),
                 json_mode=True,
                 max_tokens=8192,
+                log_name="generate_outline",
             )
             if not raw or not raw.strip():
                 raise ValueError("LLM返回了空响应")
@@ -167,7 +164,7 @@ async def generate_outline(
     roles: list[Role] = []
     murderer_role_id = ""
     for r in data["roles"]:
-        rid = _uid()
+        rid = uid()
         alignment = (
             RoleAlignment.MURDERER
             if r["alignment"] == "murderer"
@@ -287,20 +284,27 @@ async def generate_act(
                 user_prompt=_act_user_prompt(script, act_number, previous_acts),
                 json_mode=True,
                 max_tokens=8192,
+                log_name=f"generate_act({act_number})",
             )
             if not raw or not raw.strip():
                 raise ValueError("LLM返回了空响应")
             data = _parse_json(raw)
+            # Validate: choices must have 2+ options each
+            for qi, q in enumerate(data.get("choices", [])):
+                opts = q.get("options", [])
+                if len(opts) < 2:
+                    raise ValueError(f"选择题{qi+1}只有{len(opts)}个选项（需要至少2个），可能输出被截断")
             break
         except Exception as e:
             last_err = e
             if attempt < 2:
+                print(f"[generate_act] attempt {attempt+1} failed: {e}")
                 continue
             raise ValueError(f"章节生成失败(重试{attempt+1}次): {last_err}") from e
 
     clues = [
         Clue(
-            id=_uid(),
+            id=uid(),
             title=c.get("title", "线索"),
             content=c.get("content", ""),
             act=act_number,
@@ -312,7 +316,7 @@ async def generate_act(
     for q in data.get("choices", []):
         options = [
             ChoiceOption(
-                id=_uid(),
+                id=uid(),
                 text=o.get("text", ""),
                 is_correct=o.get("is_correct", False),
             )
@@ -320,7 +324,7 @@ async def generate_act(
         ]
         choices.append(
             ChoiceQuestion(
-                id=_uid(),
+                id=uid(),
                 question=q.get("question", ""),
                 options=options,
                 explanation=q.get("explanation", ""),

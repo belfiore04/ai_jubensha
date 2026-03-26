@@ -6,4 +6,6 @@ __pycache__/
 .vite/
 .venv/
 *.log
+*.jsonl
+backend/logs/
 .DS_Store

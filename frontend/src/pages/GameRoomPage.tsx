@@ -27,37 +27,31 @@ export default function GameRoomPage() {
   const navigate = useNavigate();
   const { state, dispatch } = useGame();
 
+  const session = state.session;
+  const characters = session?.characters ?? [];
+  const playerCharacterId = session?.player_character_id ?? null;
+
   const [clueOpen, setClueOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const esRef = useRef<EventSource | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // ── Message pacing ──────────────────────────────────
-  // Buffer holds all received messages; visibleCount controls how many are shown.
   const [messageBuffer, setMessageBuffer] = useState<ChatMessage[]>([]);
   const [visibleCount, setVisibleCount] = useState(0);
-  // Whether there's a pending choice that must be answered before continuing
   const [waitingForChoice, setWaitingForChoice] = useState(false);
 
   const visibleMessages = messageBuffer.slice(0, visibleCount);
-
-  // Check if there are more buffered messages to show
   const hasMore = visibleCount < messageBuffer.length;
-
-  // The last visible message — used to decide if we show "下一条" or block on choice
   const lastVisible = visibleMessages[visibleMessages.length - 1];
   const lastVisibleIsChoice = lastVisible?.type === "choice";
-
-  // Show "下一条" button when: there are more messages AND the last one isn't an unanswered choice
   const showNextButton = hasMore && !lastVisibleIsChoice && !waitingForChoice;
 
-  // Count how many DM narrations are already visible (to know if prologue has been shown)
   const dmNarrationCount = visibleMessages.filter(
     (m) => m.type === "dm_narration"
   ).length;
 
-  // Auto-advance logic: show next message automatically if it's not a "paced" type,
-  // OR if it's the first DM narration (prologue)
+  // Auto-advance: system msgs, player/character msgs, and the first DM (prologue)
   useEffect(() => {
     if (visibleCount >= messageBuffer.length) return;
     const nextMsg = messageBuffer[visibleCount];
@@ -67,7 +61,6 @@ export default function GameRoomPage() {
     const isFirstDM = nextMsg.type === "dm_narration" && dmNarrationCount === 0;
 
     if (!isPaced || isFirstDM) {
-      // Auto-advance: system msgs, player/character msgs, and the first DM (prologue)
       setVisibleCount((c) => c + 1);
     }
   }, [messageBuffer, visibleCount, dmNarrationCount]);
@@ -76,7 +69,6 @@ export default function GameRoomPage() {
     if (visibleCount < messageBuffer.length) {
       const nextMsg = messageBuffer[visibleCount];
       setVisibleCount((c) => c + 1);
-      // If the message we just revealed is a choice, block further advancement
       if (nextMsg?.type === "choice") {
         setWaitingForChoice(true);
       }
@@ -90,30 +82,23 @@ export default function GameRoomPage() {
     async function fetchAndStart() {
       try {
         dispatch({ type: "SET_LOADING", payload: true });
+        const sess = await getGame(gameId!);
+        dispatch({ type: "SET_SESSION", payload: sess });
 
-        const session = await getGame(gameId!);
-        dispatch({ type: "SET_SESSION", payload: session });
-
-        // Load existing messages into buffer (they may have been generated before SSE connected)
-        if (session.messages?.length) {
+        if (sess.messages?.length) {
           setMessageBuffer((prev) => {
             const existingIds = new Set(prev.map((m) => m.id));
-            const newMsgs = session.messages.filter((m: ChatMessage) => !existingIds.has(m.id));
+            const newMsgs = sess.messages.filter((m: ChatMessage) => !existingIds.has(m.id));
             return [...prev, ...newMsgs];
           });
         }
 
-        dispatch({ type: "SET_LOADING", payload: false });
-
         // If no messages yet (start_game still running), poll until they arrive
-        console.log("[POLL] session.messages:", session.messages?.length ?? 0);
-        if (!session.messages?.length) {
+        if (!sess.messages?.length) {
           const poll = setInterval(async () => {
             try {
               const s = await getGame(gameId!);
-              console.log("[POLL] check:", s.messages?.length ?? 0, "msgs");
               if (s.messages?.length) {
-                console.log("[POLL] got messages, filling buffer");
                 setMessageBuffer((prev) => {
                   const existingIds = new Set(prev.map((m) => m.id));
                   const newMsgs = s.messages.filter((m: ChatMessage) => !existingIds.has(m.id));
@@ -124,7 +109,6 @@ export default function GameRoomPage() {
               }
             } catch { /* ignore */ }
           }, 3000);
-          // cleanup
           setTimeout(() => clearInterval(poll), 120000);
         }
       } catch (err) {
@@ -147,16 +131,11 @@ export default function GameRoomPage() {
       (data: string) => {
         try {
           const msg: ChatMessage = JSON.parse(data);
-          console.log("[SSE]", msg.type, msg.content?.slice(0, 40));
-          // Skip player_speak from SSE (already added locally)
           if (msg.type === "player_speak") return;
-          // Add to buffer (dedup by id)
           setMessageBuffer((prev) => {
             if (prev.some((m) => m.id === msg.id)) return prev;
-            console.log("[BUFFER] added", msg.type, "total:", prev.length + 1);
             return [...prev, msg];
           });
-          // Show thinking indicator when waiting for act generation
           if (msg.type === "system" && msg.content.includes("正在生成第")) {
             setIsThinking(true);
           } else {
@@ -186,27 +165,18 @@ export default function GameRoomPage() {
       es.close();
       esRef.current = null;
     };
-  }, [gameId, navigate]);
+  }, [gameId, navigate, dispatch]);
 
-  // Auto-reveal first DM message immediately (no click needed)
+  // Auto-reveal first message
   useEffect(() => {
     if (messageBuffer.length > 0 && visibleCount === 0) {
-      // Show the first message automatically
       setVisibleCount(1);
-      // If first message is a DM narration, also auto-advance through
-      // any immediately following non-choice paced messages (up to 1 more)
-      // so the opening feels natural
     }
   }, [messageBuffer.length, visibleCount]);
 
-  // Sync visible messages to global state (for other components)
-  useEffect(() => {
-    dispatch({ type: "SET_MESSAGES_DIRECT", payload: visibleMessages });
-  }, [visibleMessages.length, dispatch]);
-
   // Timeout: if no messages after 120s, show error
   useEffect(() => {
-    if (messageBuffer.length > 0) return; // already got messages
+    if (messageBuffer.length > 0) return;
     const timer = setTimeout(() => {
       if (messageBuffer.length === 0) {
         dispatch({
@@ -247,36 +217,33 @@ export default function GameRoomPage() {
       const playerMsg: ChatMessage = {
         id: `local-${Date.now()}`,
         type: "player_speak",
-        sender_id: state.playerCharacterId || "",
+        sender_id: playerCharacterId || "",
         sender_name: "你",
         content: text,
         choices: null,
         timestamp: Date.now() / 1000,
       };
-      // Add directly to buffer and make visible immediately
       setMessageBuffer((prev) => [...prev, playerMsg]);
       setVisibleCount((c) => c + 1);
       setIsThinking(true);
 
       try {
         await playerAction(gameId, "speak", text);
-        // Responses arrive via SSE
       } catch {
         setIsThinking(false);
       }
     },
-    [gameId, state.playerCharacterId]
+    [gameId, playerCharacterId]
   );
 
   const handleChoiceSelect = useCallback(
     async (questionId: string, optionId: string) => {
       if (!gameId) return;
       setIsThinking(true);
-      setWaitingForChoice(false); // unlock pacing
+      setWaitingForChoice(false);
 
       try {
         await playerAction(gameId, "choice", optionId);
-        // Responses (correct/wrong + next content) arrive via SSE
       } catch {
         setIsThinking(false);
       }
@@ -304,25 +271,26 @@ export default function GameRoomPage() {
 
   /* ── Derived data ─────────────────────────────────── */
 
-  const title = state.session?.script?.title || "AI 剧本杀";
-  // Detect voting phase from messages (more reliable than phase state)
+  const title = session?.script?.title || "AI 剧本杀";
+  const phase = session?.phase;
+
   const isVoting =
-    state.phase === "voting" ||
+    phase === "voting" ||
     visibleMessages.some(
       (m) => m.type === "dm_narration" && m.content.includes("选出凶手")
     );
-  const isGenerating = state.phase === "generating";
+  const isGenerating = phase === "generating";
 
   const allClues: Clue[] =
-    state.session?.script?.acts.flatMap((a) => a.clues) ?? [];
+    session?.script?.acts.flatMap((a) => a.clues) ?? [];
 
   const lastMsg = visibleMessages[visibleMessages.length - 1];
   const currentSpeakerId = lastMsg?.sender_id || undefined;
 
-  const voteOptions = (state.session?.script?.roles ?? [])
+  const voteOptions = (session?.script?.roles ?? [])
     .filter((r) => {
-      const playerMapping = state.session?.mappings?.find(
-        (m) => m.character_id === state.playerCharacterId
+      const playerMapping = session?.mappings?.find(
+        (m) => m.character_id === playerCharacterId
       );
       return r.id !== playerMapping?.role_id;
     })
@@ -338,25 +306,24 @@ export default function GameRoomPage() {
         onBgmToggle={handleBgmToggle}
       />
 
-      {state.characters.length > 0 && (
+      {characters.length > 0 && (
         <AvatarRow
-          characters={state.characters}
-          mappings={state.session?.mappings}
-          roles={state.session?.script?.roles}
-          playerCharacterId={state.playerCharacterId}
+          characters={characters}
+          mappings={session?.mappings}
+          roles={session?.script?.roles}
+          playerCharacterId={playerCharacterId}
           currentSpeakerId={currentSpeakerId}
         />
       )}
 
       <ChatArea
         messages={visibleMessages}
-        characters={state.characters}
-        playerCharacterId={state.playerCharacterId}
+        characters={characters}
+        playerCharacterId={playerCharacterId}
         isThinking={isThinking}
         onChoiceSelect={handleChoiceSelect}
       />
 
-      {/* "下一条" button — hide during voting */}
       {showNextButton && !isVoting && (
         <div className="next-message-bar">
           <button className="next-message-btn" onClick={handleNextMessage}>

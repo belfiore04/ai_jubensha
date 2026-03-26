@@ -121,6 +121,7 @@ export interface GameSession {
   script: Script | null;
   messages: ChatMessage[];
   current_act: number;
+  act_answered: number;
   score: number;
   player_character_id: string;
 }

@@ -1,7 +1,6 @@
 """DM (Dungeon Master) agent – narrates, reacts, and drives the story."""
 from __future__ import annotations
 
-import uuid
 import time
 from typing import Optional
 
@@ -11,20 +10,15 @@ from app.llm.adapter import LLMAdapter, get_llm
 from app.models.game import (
     Act,
     ChatMessage,
-    GamePhase,
     GameSession,
     MessageType,
-    RoleAlignment,
+    uid,
 )
-
-
-def _uid() -> str:
-    return uuid.uuid4().hex[:12]
 
 
 def _msg(content: str, msg_type: MessageType = MessageType.DM_NARRATION) -> ChatMessage:
     return ChatMessage(
-        id=_uid(),
+        id=uid(),
         type=msg_type,
         sender_id="dm",
         sender_name="DM",
@@ -35,7 +29,7 @@ def _msg(content: str, msg_type: MessageType = MessageType.DM_NARRATION) -> Chat
 
 def _system_msg(content: str) -> ChatMessage:
     return ChatMessage(
-        id=_uid(),
+        id=uid(),
         type=MessageType.SYSTEM,
         sender_id="system",
         sender_name="系统",
@@ -49,52 +43,6 @@ class DMAgent:
 
     def __init__(self, llm: LLMAdapter | None = None):
         self.llm = llm or get_llm()
-
-    # ── narration ──────────────────────────────────────
-
-    @observe(name="DM叙述")
-    async def narrate(
-        self,
-        phase: GamePhase,
-        act: Optional[Act],
-        session: GameSession,
-    ) -> str:
-        """Generate DM narration for the current phase."""
-        if not session.script:
-            return "游戏尚未开始。"
-
-        style_label = ""
-        from app.generator.script_generator import STYLE_LABELS
-        style_label = STYLE_LABELS.get(session.script.style, "")
-
-        roles_desc = ", ".join(r.name for r in session.script.roles)
-
-        system = f"""\
-你是一场剧本杀游戏的DM（主持人），风格是「{style_label}」。
-剧本名称：{session.script.title}
-角色：{roles_desc}
-真相：{session.script.truth}
-
-作为DM，你需要：
-- 用生动的语言推动故事发展
-- 在适当的时候引导玩家思考
-- 保持悬疑感但不直接揭示真相
-- 语言风格要符合「{style_label}」的基调
-- 每次发言2-4句话，简洁有力
-"""
-
-        act_info = ""
-        if act:
-            act_info = f"\n当前是第{act.act_number}幕「{act.title}」\n叙述参考：{act.narration}"
-
-        user = f"当前阶段：{phase.value}{act_info}\n请为当前阶段生成DM叙述。"
-
-        try:
-            return await self.llm.generate(system, user)
-        except Exception:
-            if act:
-                return act.narration
-            return "故事继续……"
 
     # ── react to player ────────────────────────────────
 
@@ -150,7 +98,7 @@ AI角色：{', '.join(ai_names)}
 
         messages: list[ChatMessage] = []
         try:
-            dm_response = await self.llm.generate(system, user)
+            dm_response = await self.llm.generate(system, user, log_name="DM反应")
             dm_response = dm_response.strip()
             if dm_response and dm_response != '""' and dm_response != "''":
                 messages.append(_msg(dm_response))
@@ -169,7 +117,7 @@ AI角色：{', '.join(ai_names)}
                 clue.revealed = True
                 messages.append(
                     ChatMessage(
-                        id=_uid(),
+                        id=uid(),
                         type=MessageType.CLUE,
                         sender_id="dm",
                         sender_name="DM",
@@ -186,7 +134,7 @@ AI角色：{', '.join(ai_names)}
         if index < len(act.choices):
             q = act.choices[index]
             return ChatMessage(
-                id=_uid(),
+                id=uid(),
                 type=MessageType.CHOICE,
                 sender_id="dm",
                 sender_name="DM",
