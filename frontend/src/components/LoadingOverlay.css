@@ -1,0 +1,123 @@
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 13, 26, 0.92);
+  z-index: 200;
+  animation: fadeIn 0.3s ease;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 280px;
+}
+
+/* ── Spinner ──────────────────────────────────────── */
+
+.loading-spinner {
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+
+.spinner-ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid transparent;
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 1.2s linear infinite;
+}
+
+.spinner-ring--delay {
+  inset: 8px;
+  border-top-color: var(--purple);
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Text ─────────────────────────────────────────── */
+
+.loading-text {
+  font-size: 14px;
+  color: var(--text-primary);
+  text-align: center;
+  min-height: 20px;
+}
+
+/* ── Progress bar ────────────────────────────────── */
+
+.progress-container {
+  width: 100%;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-elevated, #252540);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--purple, #a78bfa));
+  border-radius: 3px;
+  transition: width 1s linear;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted, #666);
+}
+
+.progress-percent {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.progress-time {
+  opacity: 0.6;
+}
+
+/* ── Stage dots ──────────────────────────────────── */
+
+.stage-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bg-elevated, #252540);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.stage-dot--done {
+  background: var(--green);
+}
+
+.stage-dot--active {
+  background: var(--green);
+  animation: dotPulse 1.5s infinite ease-in-out;
+  transform: scale(1.2);
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

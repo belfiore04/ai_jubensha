@@ -1,0 +1,119 @@
+.style-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px 32px;
+  gap: 28px;
+  overflow-y: auto;
+}
+
+.style-page-header {
+  text-align: center;
+}
+
+.style-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px var(--green-glow);
+  margin-bottom: 8px;
+}
+
+.style-page-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ── Grid ─────────────────────────────────────────── */
+
+.style-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.style-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: transform var(--transition), border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.style-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--green);
+  box-shadow: 0 0 16px var(--green-glow);
+}
+
+.style-card:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.style-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.style-card-emoji {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.style-card-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.style-card-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── Random button ────────────────────────────────── */
+
+.random-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, var(--green-dim), var(--green));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 24px;
+  transition: transform var(--transition), box-shadow var(--transition);
+  box-shadow: 0 4px 16px var(--green-glow);
+}
+
+.random-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px var(--green-glow);
+}
+
+.random-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.random-btn-emoji {
+  font-size: 20px;
+}
+
+/* ── Error ────────────────────────────────────────── */
+
+.error-text {
+  color: var(--red);
+  font-size: 13px;
+  text-align: center;
+}

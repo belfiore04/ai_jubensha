@@ -1,0 +1,121 @@
+.character-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.character-page-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.character-page-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ── Character list ───────────────────────────────── */
+
+.character-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.character-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+  position: relative;
+  transition: border-color var(--transition), box-shadow var(--transition),
+    transform var(--transition);
+}
+
+.character-card:hover {
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.character-card--selected {
+  border-color: var(--green) !important;
+  box-shadow: 0 0 16px var(--green-glow);
+  background: var(--bg-elevated);
+}
+
+.character-card--selected:active {
+  transform: scale(0.98);
+}
+
+.character-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.character-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.character-card-desc {
+  font-size: 12px;
+  color: var(--green);
+  margin-bottom: 4px;
+}
+
+.character-card-personality {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.character-card-badge {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 11px;
+  color: var(--green);
+  background: rgba(74, 222, 128, 0.12);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* ── Start button ─────────────────────────────────── */
+
+.start-btn {
+  width: 100%;
+  max-width: 280px;
+  padding: 14px 0;
+  background: linear-gradient(135deg, var(--green-dim), var(--green));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 24px;
+  transition: transform var(--transition), box-shadow var(--transition),
+    opacity var(--transition);
+  box-shadow: 0 4px 16px var(--green-glow);
+  margin-top: 8px;
+}
+
+.start-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px var(--green-glow);
+}
+
+.start-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

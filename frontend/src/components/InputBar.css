@@ -1,0 +1,86 @@
+.input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  min-height: var(--input-height);
+}
+
+.input-field {
+  flex: 1;
+  height: 40px;
+  padding: 0 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color var(--transition);
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}
+
+.input-field:focus {
+  border-color: var(--green);
+}
+
+.send-btn {
+  height: 40px;
+  padding: 0 18px;
+  background: var(--green-dim);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 20px;
+  transition: background var(--transition), opacity var(--transition);
+}
+
+.send-btn:hover:not(:disabled) {
+  background: var(--green);
+}
+
+.send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Voting mode ──────────────────────────────────── */
+
+.input-bar--voting {
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+}
+
+.vote-label {
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.vote-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.vote-btn {
+  padding: 8px 20px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--red);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background var(--transition), color var(--transition);
+}
+
+.vote-btn:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--red);
+}

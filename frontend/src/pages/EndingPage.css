@@ -1,0 +1,117 @@
+.ending-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  overflow-y: auto;
+  padding: 40px 20px;
+  background: linear-gradient(
+    180deg,
+    var(--bg-primary) 0%,
+    var(--bg-secondary) 100%
+  );
+}
+
+.ending-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  max-width: 360px;
+  width: 100%;
+  animation: fadeInUp 0.6s ease;
+}
+
+.ending-badge {
+  font-size: 14px;
+  color: var(--gold);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.ending-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+/* ── Sections ─────────────────────────────────────── */
+
+.ending-section {
+  width: 100%;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.ending-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.ending-truth {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* ── Murderer ─────────────────────────────────────── */
+
+.ending-murderer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ending-murderer-icon {
+  font-size: 36px;
+}
+
+.ending-murderer-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--red);
+  margin-bottom: 4px;
+}
+
+.ending-murderer-bg {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Score ─────────────────────────────────────────── */
+
+.ending-score {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+  text-shadow: 0 0 24px rgba(251, 191, 36, 0.3);
+}
+
+/* ── Replay button ────────────────────────────────── */
+
+.replay-btn {
+  padding: 14px 48px;
+  background: linear-gradient(135deg, var(--green-dim), var(--green));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 24px;
+  transition: transform var(--transition), box-shadow var(--transition);
+  box-shadow: 0 4px 16px var(--green-glow);
+  margin-top: 8px;
+}
+
+.replay-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px var(--green-glow);
+}

@@ -1,0 +1,113 @@
+.clue-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  animation: fadeIn 0.2s ease;
+}
+
+.clue-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  max-width: var(--max-width);
+  height: 100%;
+  background: var(--bg-secondary);
+  z-index: 101;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.clue-panel--open {
+  transform: translateX(0);
+}
+
+.clue-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.clue-panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.clue-panel-close {
+  font-size: 24px;
+  color: var(--text-muted);
+  padding: 4px;
+  transition: color var(--transition);
+}
+
+.clue-panel-close:hover {
+  color: var(--text-primary);
+}
+
+.clue-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* ── Empty state ──────────────────────────────────── */
+
+.clue-panel-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.clue-panel-empty-icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.clue-panel-empty-hint {
+  font-size: 12px;
+  margin-top: 8px;
+  color: var(--text-muted);
+}
+
+/* ── Clue list ────────────────────────────────────── */
+
+.clue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.clue-item {
+  background: var(--bg-card);
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: 0 0 8px var(--green-glow);
+}
+
+.clue-item-act {
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.clue-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.clue-item-content {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}

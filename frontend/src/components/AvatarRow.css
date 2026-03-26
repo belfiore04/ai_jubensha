@@ -1,0 +1,42 @@
+.avatar-row {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+
+.avatar-row-scroll {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  justify-content: center;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.avatar-row-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.avatar-row-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.avatar-row-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.avatar-row-role {
+  font-size: 9px;
+  color: var(--accent, #4ade80);
+  white-space: nowrap;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
