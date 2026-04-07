@@ -396,6 +396,7 @@ class GameEngine:
         if disc_engine and disc_history is not None and _in_discussion.get(game_id):
             # Add player message to discussion history
             disc_history.append(player_msg)
+            _debug(game_id, f"💬 玩家发言: {content[:30]}...")
 
             # AI multi-round response via discussion engine
             def on_message(char_name: str, role_name: str, reply_content: str):
@@ -512,6 +513,7 @@ class GameEngine:
             player_character_id=session.player_character_id,
             llm=self.llm,
             script_context=f"剧本「{session.script.title if session.script else ''}」",
+            debug_fn=lambda msg: _debug(game_id, msg),
         )
         _disc_engines[game_id] = engine
         _disc_histories[game_id] = []

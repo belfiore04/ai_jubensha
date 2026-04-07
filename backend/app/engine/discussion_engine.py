@@ -95,6 +95,7 @@ class DiscussionEngine:
         player_character_id: str,
         llm: LLMAdapter,
         script_context: str = "",
+        debug_fn: Callable[[str], None] | None = None,
     ):
         self.characters = characters
         self.roles = roles
@@ -102,19 +103,20 @@ class DiscussionEngine:
         self.player_character_id = player_character_id
         self.llm = llm
         self.script_context = script_context
+        self._debug_fn = debug_fn
 
         # Discussion-specific LLM clients (DeepSeek / qwen-turbo)
         self._chat_client, self._chat_model = _disc_chat_client()
         self._selector_client, self._selector_model = _disc_selector_client()
 
         if self._chat_client:
-            print(f"[Discussion] 对话模型: {self._chat_model}")
+            self._log(f"对话模型: {self._chat_model}")
         else:
-            print(f"[Discussion] 对话模型: {llm.model} (默认)")
+            self._log(f"对话模型: {llm.model} (默认)")
         if self._selector_client:
-            print(f"[Discussion] 选人模型: {self._selector_model}")
+            self._log(f"选人模型: {self._selector_model}")
         else:
-            print(f"[Discussion] 选人模型: {llm.model} (默认)")
+            self._log(f"选人模型: {llm.model} (默认)")
 
         # Build lookup tables
         self._char_by_id = {c.id: c for c in characters}
@@ -125,6 +127,12 @@ class DiscussionEngine:
         self.ai_char_ids = [
             m.character_id for m in mappings if m.character_id != player_character_id
         ]
+
+    def _log(self, msg: str) -> None:
+        """Print to terminal AND send to debug callback (SSE)."""
+        print(f"[Discussion] {msg}")
+        if self._debug_fn:
+            self._debug_fn(f"🗣️ {msg}")
 
     def _get_role(self, character_id: str) -> Role | None:
         m = self._mapping_by_char.get(character_id)
@@ -296,7 +304,7 @@ class DiscussionEngine:
                 )
                 if not raw or not raw.strip():
                     if attempt == 0:
-                        print(f"[Discussion] 选人返回空，重试...")
+                        self._log("选人返回空，重试...")
                         continue
                     # Second empty = treat as no responders
                     break
@@ -314,14 +322,14 @@ class DiscussionEngine:
                     selected = [random.choice(available)]
 
                 selected_names = [self._role_name(cid) for cid in selected]
-                print(f"[Discussion] 选中: {selected_names}")
+                self._log(f"选中: {selected_names}")
                 return selected
 
             except Exception as e:
                 if attempt == 0:
-                    print(f"[Discussion] 选人解析失败({e})，重试...")
+                    self._log(f"选人解析失败({e})，重试...")
                     continue
-                print(f"[Discussion] LLM 选人失败: {e}")
+                self._log(f"LLM 选人失败: {e}")
 
         # Final fallback after all retries exhausted
         if is_ai_round:
@@ -358,7 +366,7 @@ class DiscussionEngine:
                 all_names.append(player_role.name)
             return _post_process_reply(raw, role.name, all_names)
         except Exception as e:
-            print(f"[Discussion] 回复生成失败 ({char.name}): {e}")
+            self._log(f"回复生成失败 ({char.name}): {e}")
             return "……"
 
     # ── Initial round: all AI characters speak ─────────
@@ -380,16 +388,18 @@ class DiscussionEngine:
             reply = await self._generate_reply(cid, history)
             # Retry once if empty (model may return think-only response)
             if not reply or reply == "……":
-                print(f"[Discussion] {self._char_name(cid)} 首次回复为空，重试...")
+                self._log(f"{self._char_name(cid)} 首次回复为空，重试...")
                 reply = await self._generate_reply(cid, history)
             if not reply or reply == "……":
-                print(f"[Discussion] {self._char_name(cid)} 重试仍为空，跳过")
+                self._log(f"{self._char_name(cid)} 重试仍为空，跳过")
                 continue
 
             role = self._get_role(cid)
             char = self._get_char(cid)
             role_name = role.name if role else "?"
             char_name = char.name if char else "?"
+
+            self._log(f"{char_name}({role_name}) 发言: {reply[:40]}...")
 
             msg = ChatMessage(
                 id=uid(),
@@ -424,6 +434,7 @@ class DiscussionEngine:
         current_trigger_message = trigger_message
         exclude_ids: list[str] = []
 
+        self._log(f"多轮讨论开始 (触发: {trigger_sender})")
         for round_num in range(MAX_AI_ROUNDS):
             is_ai_round = round_num > 0
 
@@ -436,6 +447,7 @@ class DiscussionEngine:
             )
 
             if not responder_ids:
+                self._log(f"多轮讨论结束 (第{round_num+1}轮无人回复)")
                 break
 
             last_speaker_id = None
@@ -448,6 +460,8 @@ class DiscussionEngine:
                 char = self._get_char(cid)
                 role_name = role.name if role else "?"
                 char_name = char.name if char else "?"
+
+                self._log(f"{char_name}({role_name}) 回复: {reply[:40]}...")
 
                 msg = ChatMessage(
                     id=uid(),
@@ -466,6 +480,7 @@ class DiscussionEngine:
                     await result
 
             if not last_speaker_id:
+                self._log(f"多轮讨论结束 (第{round_num+1}轮全部回复为空)")
                 break
 
             # Next round: triggered by last speaker, exclude them
@@ -514,7 +529,7 @@ class DiscussionEngine:
             history.append(clue_msg)
 
         # Initial round: ALL AI characters speak once (no selector)
-        print("[Discussion] 初始轮：全员发言")
+        self._log("初始轮：全员发言")
         await self._all_ai_speak(history, on_message)
 
         # Player input loop
