@@ -290,11 +290,11 @@ export default function GameRoomPage() {
     visibleMessages.some(
       (m) => m.type === "dm_narration" && m.content.includes("选出凶手")
     );
-  const isGenerating = phase === "generating" &&
-    !messageBuffer.some(
-      (m) => m.type === "character_speak" ||
-        (m.type === "system" && m.content.includes("自由讨论开始"))
-    );
+  // Note: isGenerating is NOT used for input disabled state.
+  // During generation, LoadingOverlay blocks the UI. After generation,
+  // session.phase can be stale (fetched once, never refreshed).
+  // isThinking (managed by SSE) is the reliable signal.
+  const isGenerating = phase === "generating";
 
   // Discussion mode: active between "自由讨论开始" and first choice message
   const isDiscussing = (() => {
@@ -363,7 +363,7 @@ export default function GameRoomPage() {
 
       <InputBar
         onSend={handleSend}
-        disabled={isThinking || isGenerating || waitingForChoice}
+        disabled={isThinking || waitingForChoice}
         votingMode={isVoting}
         voteOptions={voteOptions}
         onVote={handleVote}
