@@ -12,7 +12,9 @@ export default function RoleSelectPage() {
   const { state } = useGame();
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
-  const roles = state.session?.script?.roles ?? [];
+  const roles = (state.session?.script?.roles ?? []).filter(
+    (r) => r.alignment !== "murderer"
+  );
   const isGenerating = state.session?.phase === "generating";
 
   // Pick a random default character for the player (first one)

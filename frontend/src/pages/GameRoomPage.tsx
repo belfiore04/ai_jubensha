@@ -351,6 +351,8 @@ export default function GameRoomPage() {
         playerCharacterId={playerCharacterId}
         isThinking={isThinking}
         onChoiceSelect={handleChoiceSelect}
+        mappings={session?.mappings}
+        roles={session?.script?.roles}
       />
 
       {showNextButton && !isVoting && (

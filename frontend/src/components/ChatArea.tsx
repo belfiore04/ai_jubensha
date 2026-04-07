@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage, Character, ChoiceQuestion } from "../types";
+import type { ChatMessage, Character, CharacterRoleMapping, Role, ChoiceQuestion } from "../types";
 import Avatar from "./Avatar";
 import "./ChatArea.css";
 
@@ -9,6 +9,8 @@ interface ChatAreaProps {
   playerCharacterId: string | null;
   isThinking: boolean;
   onChoiceSelect?: (questionId: string, optionId: string) => void;
+  mappings?: CharacterRoleMapping[];
+  roles?: Role[];
 }
 
 export default function ChatArea({
@@ -17,6 +19,8 @@ export default function ChatArea({
   playerCharacterId,
   isThinking,
   onChoiceSelect,
+  mappings = [],
+  roles = [],
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -26,6 +30,13 @@ export default function ChatArea({
 
   function findCharacter(id: string): Character | undefined {
     return characters.find((c) => c.id === id);
+  }
+
+  function getRoleName(characterId: string): string | undefined {
+    const mapping = mappings.find((m) => m.character_id === characterId);
+    if (!mapping) return undefined;
+    const role = roles.find((r) => r.id === mapping.role_id);
+    return role?.name;
   }
 
   function renderMessage(msg: ChatMessage, index: number) {
@@ -109,16 +120,17 @@ export default function ChatArea({
       case "character_speak":
       default: {
         const char = findCharacter(msg.sender_id);
+        const displayName = getRoleName(msg.sender_id) || msg.sender_name || "???";
         return (
           <div key={msg.id || index} className="msg msg-character animate-in">
             <Avatar
               id={msg.sender_id}
-              name={msg.sender_name || "???"}
+              name={displayName}
               avatar={char?.avatar || undefined}
               size={32}
             />
             <div className="msg-character-body">
-              <span className="msg-sender-name">{msg.sender_name}</span>
+              <span className="msg-sender-name">{displayName}</span>
               <div className="msg-bubble msg-bubble-character">
                 {msg.content}
               </div>
