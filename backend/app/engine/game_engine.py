@@ -204,7 +204,8 @@ class GameEngine:
 
         # Collect AI characters for personality-aware generation
         ai_chars = [c for c in session.characters if c.id != session.player_character_id]
-        has_external = any(c.personality for c in ai_chars)
+        # Pass characters if: any have personality OR we need fillers (< 3 AI)
+        need_characters = any(c.personality for c in ai_chars) or len(ai_chars) < 3
 
         # generate outline (roles are created by the LLM)
         _debug(game_id, "🤖 LLM调用: generate_outline 开始...")
@@ -212,7 +213,7 @@ class GameEngine:
             script, filler_chars = await generate_outline(
                 style,
                 llm=self.llm,
-                characters=ai_chars if has_external else None,
+                characters=ai_chars if need_characters else None,
             )
         except Exception as e:
             _debug(game_id, f"❌ 大纲生成失败: {e}")
