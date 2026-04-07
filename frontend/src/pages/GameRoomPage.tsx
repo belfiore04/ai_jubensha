@@ -290,7 +290,11 @@ export default function GameRoomPage() {
     visibleMessages.some(
       (m) => m.type === "dm_narration" && m.content.includes("选出凶手")
     );
-  const isGenerating = phase === "generating";
+  const isGenerating = phase === "generating" &&
+    !messageBuffer.some(
+      (m) => m.type === "character_speak" ||
+        (m.type === "system" && m.content.includes("自由讨论开始"))
+    );
 
   // Discussion mode: active between "自由讨论开始" and first choice message
   const isDiscussing = (() => {
