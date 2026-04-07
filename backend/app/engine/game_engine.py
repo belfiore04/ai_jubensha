@@ -179,11 +179,6 @@ class GameEngine:
         session.style = style
         session.phase = GamePhase.GENERATING
 
-        _push(
-            session,
-            _make_msg(f"已选择风格：{style.value}，正在生成剧本大纲……", MessageType.SYSTEM),
-        )
-
         # generate outline (roles are created by the LLM)
         _debug(game_id, "🤖 LLM调用: generate_outline 开始...")
         try:
@@ -194,14 +189,6 @@ class GameEngine:
         _debug(game_id, f"✅ 大纲生成完成: {script.title}")
         session.script = script
         session.phase = GamePhase.ROLE_ASSIGN
-
-        _push(
-            session,
-            _make_msg(
-                f"剧本「{script.title}」已生成！请选择你想扮演的角色。",
-                MessageType.SYSTEM,
-            ),
-        )
         return session
 
     async def start_game(

@@ -146,6 +146,8 @@ async def generate_outline(
             if not raw or not raw.strip():
                 raise ValueError("LLM返回了空响应")
             data = _parse_json(raw)
+            if not isinstance(data, dict):
+                raise ValueError(f"LLM返回的不是JSON对象: {type(data).__name__}")
             # 校验：必须有4个roles，且恰好1个murderer
             role_list = data.get("roles", [])
             if len(role_list) != 4:
@@ -291,6 +293,8 @@ async def generate_act(
             if not raw or not raw.strip():
                 raise ValueError("LLM返回了空响应")
             data = _parse_json(raw)
+            if not isinstance(data, dict):
+                raise ValueError(f"LLM返回的不是JSON对象: {type(data).__name__}, 内容: {str(data)[:100]}")
             # Validate: choices must have 2+ options each
             for qi, q in enumerate(data.get("choices", [])):
                 opts = q.get("options", [])
