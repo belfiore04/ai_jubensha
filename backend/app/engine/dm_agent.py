@@ -150,7 +150,13 @@ AI角色：{', '.join(ai_names)}
         """Prompt the player to vote for the murderer."""
         if not session.script:
             return _msg("投票环节开始！请选出你认为的凶手。")
-        names = [r.name for r in session.script.roles]
+        # Exclude the player's own role from vote options
+        player_role_id = ""
+        for m in session.mappings:
+            if m.character_id == session.player_character_id:
+                player_role_id = m.role_id
+                break
+        names = [r.name for r in session.script.roles if r.id != player_role_id]
         return _msg(
             "经过三幕的调查，是时候做出最终判断了。"
             f"请从以下角色中选出凶手：{', '.join(names)}"

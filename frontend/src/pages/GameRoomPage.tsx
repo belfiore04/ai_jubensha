@@ -121,7 +121,10 @@ export default function GameRoomPage() {
           }
           msgCountRef.current = s.messages.length;
         }
-        if (s.phase === "ending") clearInterval(poll);
+        if (s.phase === "ending") {
+          clearInterval(poll);
+          setTimeout(() => navigate("/ending"), 1500);
+        }
       } catch { /* ignore */ }
     }, 3000);
     const timeout = setTimeout(() => clearInterval(poll), 600000);
