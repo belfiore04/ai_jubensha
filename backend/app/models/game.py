@@ -69,6 +69,7 @@ class Role(BaseModel):
     alignment: RoleAlignment
     background: str = ""
     secret: str = ""
+    goal: str = ""
     clues: list[str] = Field(default_factory=list)
 
 

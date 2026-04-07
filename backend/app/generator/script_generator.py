@@ -114,7 +114,8 @@ def _outline_user_prompt(style: ScriptStyle) -> str:
       "alignment": "murderer 或 innocent",
       "background": "角色背景（1-2句话，简洁）",
       "secret": "角色秘密（1-2句话，简洁）",
-      "clues": ["线索1（一句话）", "线索2（一句话）"]
+      "clues": ["线索1（一句话）", "线索2（一句话）"],
+      "goal": "该角色在讨论中的隐藏目标（1句话，如'引导众人怀疑X'或'保护自己的不在场证明'）"
     }}
   ]
 }}
@@ -179,6 +180,7 @@ async def generate_outline(
                 alignment=alignment,
                 background=r.get("background", ""),
                 secret=r.get("secret", ""),
+                goal=r.get("goal", ""),
                 clues=r.get("clues", []),
             )
         )

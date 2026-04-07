@@ -96,6 +96,26 @@ class LLMAdapter:
                 self._logger.llm_error(log_ctx, e)
             raise
 
+    @observe(name="LLM.generate_chat")
+    async def generate_chat(
+        self,
+        messages: list[dict[str, str]],
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        """Multi-message chat completion (for discussion engine)."""
+        try:
+            resp = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=max_tokens or self.max_tokens,
+                temperature=temperature if temperature is not None else self.temperature,
+            )
+            raw = resp.choices[0].message.content or ""
+            return _strip_thinking(raw)
+        except Exception:
+            raise
+
     async def stream(
         self,
         system_prompt: str,

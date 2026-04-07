@@ -14,6 +14,7 @@ from langfuse.openai import AsyncOpenAI as LangfuseAsyncOpenAI
 openai.AsyncOpenAI = LangfuseAsyncOpenAI  # type: ignore[misc]
 
 from app.engine.game_engine import GameEngine, PLATFORM_CHARACTERS, _make_msg, _push
+from app.engine.discussion_engine import DiscussionEngine
 from app.generator.script_generator import generate_outline, generate_act, STYLE_LABELS
 from app.llm.adapter import LLMAdapter
 from app.logger import GameLogger, C
@@ -186,61 +187,36 @@ async def main():
         # ── Discussion phase ─────────────────────────
         logger.section(f"第{act_label}幕 — 自由讨论")
         print(f"\n  {C.DIM}角色们开始讨论线索。你可以随时输入发言参与讨论。{C.RESET}")
-        print(f"  {C.DIM}按回车跳过/结束讨论。最多 3 轮。{C.RESET}\n")
+        print(f"  {C.DIM}按回车结束讨论。{C.RESET}\n")
 
-        clue_text = "\n".join(f"- 【{cl.title}】{cl.content}" for cl in act.clues)
-        discussion_history: list[ChatMessage] = []
+        disc_engine = DiscussionEngine(
+            characters=list(PLATFORM_CHARACTERS),
+            roles=script.roles,
+            mappings=mappings,
+            player_character_id=player_char.id,
+            llm=llm,
+            script_context=f"剧本「{script.title}」，当前：第{act_label}幕「{act.title}」",
+        )
 
-        for round_num in range(1, 4):
-            print(f"  {C.DIM}── 讨论轮次 {round_num} ──{C.RESET}")
+        def on_disc_message(char_name: str, role_name: str, content: str):
+            logger.character_speak(char_name, role_name, content)
 
-            # AI characters speak concurrently
-            ai_chars = [
-                (m.character_id, next((c.name for c in session.characters if c.id == m.character_id), "?"))
-                for m in mappings if not m.is_player
-            ]
-
-            async def _one_response(cid: str, char_name: str) -> tuple[str, str, str]:
-                from app.engine.character_agent import CharacterAgent
-                agent = CharacterAgent(cid, llm=llm)
-                role = next((r for r in script.roles for m in mappings if m.character_id == cid and m.role_id == r.id), None)
-                role_name = role.name if role else "?"
-                text = await agent.respond(
-                    context=discussion_history,
-                    game_state=session,
-                    mode="discuss",
-                    clue_context=clue_text,
-                )
-                return char_name, role_name, text
-
-            results = await asyncio.gather(*[_one_response(cid, name) for cid, name in ai_chars])
-
-            for char_name, role_name, text in results:
-                logger.character_speak(char_name, role_name, text)
-                discussion_history.append(ChatMessage(
-                    id=uid(), type=MessageType.CHARACTER_SPEAK,
-                    sender_id=char_name, sender_name=f"{char_name}({role_name})",
-                    content=text, timestamp=0,
-                ))
-
-            # Player input
+        def get_player_disc_input() -> str:
             print()
-            player_input = input_text(f"  {C.WHITE}{C.BOLD}> {C.RESET}")
-            if player_input:
-                role_name = player_role.name
-                logger.player_speak(player_char.name, role_name, player_input)
-                discussion_history.append(ChatMessage(
-                    id=uid(), type=MessageType.PLAYER_SPEAK,
-                    sender_id=player_char.id, sender_name=f"{player_char.name}({role_name})",
-                    content=player_input, timestamp=0,
-                ))
+            text = input_text(f"  {C.WHITE}{C.BOLD}> {C.RESET}")
+            if text:
+                logger.player_speak(player_char.name, player_role.name, text)
             else:
-                # Empty input = end discussion
-                if round_num < 3:
-                    logger.system("讨论结束，进入选择题。")
-                break
+                logger.system("讨论结束，进入选择题。")
+            return text
 
-        logger.event("discussion_ended", act=act_num, rounds=round_num)
+        await disc_engine.run_discussion(
+            clues=act.clues,
+            on_message=on_disc_message,
+            get_player_input=get_player_disc_input,
+        )
+
+        logger.event("discussion_ended", act=act_num)
 
         # ── Choice questions ─────────────────────────
         if act.choices:
