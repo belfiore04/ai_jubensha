@@ -237,7 +237,7 @@ export default function GameRoomPage() {
   );
 
   const handleChoiceSelect = useCallback(
-    async (questionId: string, optionId: string) => {
+    async (_questionId: string, optionId: string) => {
       if (!gameId) return;
       setIsThinking(true);
       setWaitingForChoice(false);
@@ -265,6 +265,16 @@ export default function GameRoomPage() {
     [gameId]
   );
 
+  const handleEndDiscussion = useCallback(async () => {
+    if (!gameId) return;
+    setIsThinking(true);
+    try {
+      await playerAction(gameId, "end_discussion", "");
+    } catch {
+      setIsThinking(false);
+    }
+  }, [gameId]);
+
   const handleBgmToggle = useCallback(() => {
     dispatch({ type: "TOGGLE_BGM" });
   }, [dispatch]);
@@ -280,6 +290,20 @@ export default function GameRoomPage() {
       (m) => m.type === "dm_narration" && m.content.includes("选出凶手")
     );
   const isGenerating = phase === "generating";
+
+  // Discussion mode: active between "自由讨论开始" and first choice message
+  const isDiscussing = (() => {
+    let discussing = false;
+    for (const m of visibleMessages) {
+      if (m.type === "system" && m.content.includes("自由讨论开始")) {
+        discussing = true;
+      }
+      if (m.type === "choice") {
+        discussing = false;
+      }
+    }
+    return discussing;
+  })();
 
   const allClues: Clue[] =
     session?.script?.acts.flatMap((a) => a.clues) ?? [];
@@ -338,6 +362,8 @@ export default function GameRoomPage() {
         votingMode={isVoting}
         voteOptions={voteOptions}
         onVote={handleVote}
+        discussionMode={isDiscussing}
+        onEndDiscussion={handleEndDiscussion}
       />
 
       <CluePanel

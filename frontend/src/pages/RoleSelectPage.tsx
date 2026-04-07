@@ -9,7 +9,7 @@ import "./RoleSelectPage.css";
 
 export default function RoleSelectPage() {
   const navigate = useNavigate();
-  const { state, dispatch } = useGame();
+  const { state } = useGame();
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
   const roles = state.session?.script?.roles ?? [];

@@ -49,6 +49,30 @@
   cursor: not-allowed;
 }
 
+/* ── End discussion button ───────────────────────── */
+
+.end-discussion-btn {
+  height: 40px;
+  padding: 0 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 20px;
+  white-space: nowrap;
+  transition: background var(--transition), opacity var(--transition);
+}
+
+.end-discussion-btn:hover:not(:disabled) {
+  background: rgba(234, 179, 8, 0.15);
+}
+
+.end-discussion-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Voting mode ──────────────────────────────────── */
 
 .input-bar--voting {

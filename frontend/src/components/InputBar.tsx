@@ -8,6 +8,8 @@ interface InputBarProps {
   votingMode?: boolean;
   voteOptions?: { id: string; name: string }[];
   onVote?: (characterId: string) => void;
+  discussionMode?: boolean;
+  onEndDiscussion?: () => void;
 }
 
 export default function InputBar({
@@ -17,6 +19,8 @@ export default function InputBar({
   votingMode = false,
   voteOptions = [],
   onVote,
+  discussionMode = false,
+  onEndDiscussion,
 }: InputBarProps) {
   const [text, setText] = useState("");
 
@@ -54,9 +58,19 @@ export default function InputBar({
         type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={placeholder}
+        placeholder={discussionMode ? "参与讨论，或结束讨论进入推理..." : placeholder}
         disabled={disabled}
       />
+      {discussionMode && (
+        <button
+          className="end-discussion-btn"
+          type="button"
+          onClick={onEndDiscussion}
+          disabled={disabled}
+        >
+          结束讨论
+        </button>
+      )}
       <button
         className="send-btn"
         type="submit"

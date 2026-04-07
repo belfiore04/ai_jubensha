@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from app.engine.character_agent import CharacterAgent
+from app.engine.discussion_engine import DiscussionEngine
 from app.engine.dm_agent import DMAgent
 from app.generator.script_generator import generate_act, generate_outline
 from app.llm.adapter import LLMAdapter, get_llm
@@ -62,6 +63,10 @@ _bg_tasks: dict[str, asyncio.Task] = {}  # type: ignore[type-arg]
 _message_queues: dict[str, asyncio.Queue] = {}  # type: ignore[type-arg]
 # debug log queues
 _debug_queues: dict[str, asyncio.Queue] = {}  # type: ignore[type-arg]
+# discussion engine state
+_disc_engines: dict[str, DiscussionEngine] = {}
+_disc_histories: dict[str, list[ChatMessage]] = {}
+_in_discussion: dict[str, bool] = {}
 
 
 def _debug(game_id: str, msg: str) -> None:
@@ -319,11 +324,8 @@ class GameEngine:
             _push(session, cm)
             messages.append(cm)
 
-        # present first choice (only first one — wait for answer before next)
-        choice_msg = self.dm.present_choice(act1, 0)
-        if choice_msg:
-            _push(session, choice_msg)
-            messages.append(choice_msg)
+        # Start discussion phase (AI characters discuss clues)
+        asyncio.create_task(self._start_discussion(session, act1))
 
         return messages
 
@@ -366,19 +368,30 @@ class GameEngine:
             return await self._handle_choice(session, content)
         elif action_type == "vote":
             return await self._handle_vote(session, content)
+        elif action_type == "end_discussion":
+            return await self._handle_end_discussion(session)
         else:
             raise ValueError(f"Unknown action type: {action_type}")
 
     async def _handle_speak(
         self, session: GameSession, content: str
     ) -> list[ChatMessage]:
-        """Player speaks freely; DM + AI characters may respond."""
+        """Player speaks freely; AI characters respond via discussion engine."""
+        game_id = session.id
+
         # find player character name
         player_name = "玩家"
+        player_role_name = ""
         for c in session.characters:
             if c.id == session.player_character_id:
                 player_name = c.name
                 break
+        for m in session.mappings:
+            if m.character_id == session.player_character_id and session.script:
+                for r in session.script.roles:
+                    if r.id == m.role_id:
+                        player_role_name = r.name
+                        break
 
         player_msg = _make_msg(
             content,
@@ -387,38 +400,59 @@ class GameEngine:
             sender_name=player_name,
         )
         _push(session, player_msg)
-
         result: list[ChatMessage] = [player_msg]
 
-        # DM reacts
-        dm_msgs = await self.dm.react(content, session.messages, session)
-        for m in dm_msgs:
-            _push(session, m)
-            result.append(m)
+        # Use discussion engine if in discussion mode
+        disc_engine = _disc_engines.get(game_id)
+        disc_history = _disc_histories.get(game_id)
 
-        # AI characters respond (pick 1-2 randomly for brevity)
-        ai_char_ids = [
-            m.character_id for m in session.mappings if not m.is_player
-        ]
+        if disc_engine and disc_history is not None and _in_discussion.get(game_id):
+            # Add player message to discussion history
+            disc_history.append(player_msg)
 
-        # let up to 2 characters respond
-        responders = random.sample(ai_char_ids, min(2, len(ai_char_ids)))
-        for cid in responders:
-            agent = self._get_agent(cid)
-            text = await agent.respond(session.messages, session)
-            char_name = cid
-            for c in session.characters:
-                if c.id == cid:
-                    char_name = c.name
-                    break
-            char_msg = _make_msg(
-                text,
-                MessageType.CHARACTER_SPEAK,
-                sender_id=cid,
-                sender_name=char_name,
+            # AI multi-round response via discussion engine
+            def on_message(char_name: str, role_name: str, reply_content: str):
+                msg = _make_msg(
+                    reply_content,
+                    MessageType.CHARACTER_SPEAK,
+                    sender_id=next(
+                        (c.id for c in session.characters if c.name == char_name),
+                        char_name,
+                    ),
+                    sender_name=char_name,
+                )
+                _push(session, msg)
+                disc_history.append(msg)
+                result.append(msg)
+
+            await disc_engine._ai_multi_round(
+                disc_history,
+                trigger_sender=player_role_name or player_name,
+                trigger_message=content,
+                on_message=on_message,
             )
-            _push(session, char_msg)
-            result.append(char_msg)
+        else:
+            # Fallback: random AI responses (non-discussion mode)
+            ai_char_ids = [
+                m.character_id for m in session.mappings if not m.is_player
+            ]
+            responders = random.sample(ai_char_ids, min(2, len(ai_char_ids)))
+            for cid in responders:
+                agent = self._get_agent(cid)
+                text = await agent.respond(session.messages, session)
+                char_name = cid
+                for c in session.characters:
+                    if c.id == cid:
+                        char_name = c.name
+                        break
+                char_msg = _make_msg(
+                    text,
+                    MessageType.CHARACTER_SPEAK,
+                    sender_id=cid,
+                    sender_name=char_name,
+                )
+                _push(session, char_msg)
+                result.append(char_msg)
 
         return result
 
@@ -474,6 +508,84 @@ class GameEngine:
         for m in msgs:
             _push(session, m)
             result.append(m)
+        return result
+
+    # ── discussion engine integration ─────────────────
+
+    async def _start_discussion(self, session: GameSession, act: Act) -> None:
+        """Start discussion phase: create engine, all AI speak, push to SSE."""
+        game_id = session.id
+        _debug(game_id, "💬 讨论阶段开始")
+
+        # Create discussion engine for this game
+        engine = DiscussionEngine(
+            characters=session.characters,
+            roles=session.script.roles if session.script else [],
+            mappings=session.mappings,
+            player_character_id=session.player_character_id,
+            llm=self.llm,
+            script_context=f"剧本「{session.script.title if session.script else ''}」",
+        )
+        _disc_engines[game_id] = engine
+        _disc_histories[game_id] = []
+        _in_discussion[game_id] = True
+
+        # Inject clue context into discussion history
+        if act.clues:
+            clue_text = "本轮发现的线索：\n" + "\n".join(
+                f"- 【{cl.title}】{cl.content}" for cl in act.clues
+            )
+            clue_msg = _make_msg(clue_text, MessageType.SYSTEM)
+            _disc_histories[game_id].append(clue_msg)
+
+        # Signal discussion start to frontend
+        start_msg = _make_msg("自由讨论开始，角色们正在发表看法……", MessageType.SYSTEM)
+        _push(session, start_msg)
+
+        # All AI characters speak (sequential, context-aware)
+        def on_message(char_name: str, role_name: str, content: str):
+            msg = _make_msg(
+                content,
+                MessageType.CHARACTER_SPEAK,
+                sender_id=next(
+                    (c.id for c in session.characters if c.name == char_name),
+                    char_name,
+                ),
+                sender_name=char_name,
+            )
+            _push(session, msg)
+            _disc_histories[game_id].append(msg)
+
+        await engine._all_ai_speak(_disc_histories[game_id], on_message)
+
+        # Signal that AI finished initial round
+        hint_msg = _make_msg(
+            "角色们已发表看法。你可以自由发言参与讨论，或点击「结束讨论」进入推理环节。",
+            MessageType.SYSTEM,
+        )
+        _push(session, hint_msg)
+        _debug(game_id, "💬 初始轮发言完毕，等待玩家")
+
+    async def _handle_end_discussion(
+        self, session: GameSession
+    ) -> list[ChatMessage]:
+        """End discussion, present first choice question."""
+        game_id = session.id
+        _in_discussion[game_id] = False
+        _debug(game_id, "💬 讨论结束，进入选择题")
+
+        result: list[ChatMessage] = []
+        end_msg = _make_msg("讨论结束，进入推理环节。", MessageType.SYSTEM)
+        _push(session, end_msg)
+        result.append(end_msg)
+
+        current = self._current_act(session)
+        if current:
+            choice_msg = self.dm.present_choice(current, session.act_answered)
+            if choice_msg:
+                _push(session, choice_msg)
+                result.append(choice_msg)
+
         return result
 
     # ── phase management ───────────────────────────────
@@ -566,10 +678,8 @@ class GameEngine:
                     _push(session, cm)
                     result.append(cm)
 
-                choice_msg = self.dm.present_choice(next_act, 0)
-                if choice_msg:
-                    _push(session, choice_msg)
-                    result.append(choice_msg)
+                # Start discussion for next act (runs in background, pushes to SSE)
+                asyncio.create_task(self._start_discussion(session, next_act))
         else:
             session.phase = GamePhase.VOTING
             vote_msg = self.dm.start_vote(session)

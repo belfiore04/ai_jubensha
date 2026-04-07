@@ -51,7 +51,7 @@ export function startGame(
 
 export function playerAction(
   gameId: string,
-  actionType: "speak" | "choice" | "vote",
+  actionType: "speak" | "choice" | "vote" | "end_discussion",
   content: string
 ): Promise<{ messages: GameSession["messages"] }> {
   return request(`${API}/game/${gameId}/action`, {
