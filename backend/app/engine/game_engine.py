@@ -184,9 +184,9 @@ class GameEngine:
         )
 
         # Use provided AI characters or fall back to platform defaults
+        # If external chars provided (even < 3), keep as-is — fillers added at set_style
         ai_chars = ai_characters if ai_characters else list(PLATFORM_CHARACTERS)
-        # Ensure exactly 3 AI characters
-        ai_chars = ai_chars[:3]
+        ai_chars = ai_chars[:3]  # cap at 3
 
         session.characters = [player_char] + ai_chars
         session.player_character_id = player_char.id
@@ -202,14 +202,29 @@ class GameEngine:
         session.style = style
         session.phase = GamePhase.GENERATING
 
+        # Collect AI characters for personality-aware generation
+        ai_chars = [c for c in session.characters if c.id != session.player_character_id]
+        has_external = any(c.personality for c in ai_chars)
+
         # generate outline (roles are created by the LLM)
         _debug(game_id, "🤖 LLM调用: generate_outline 开始...")
         try:
-            script = await generate_outline(style, llm=self.llm)
+            script, filler_chars = await generate_outline(
+                style,
+                llm=self.llm,
+                characters=ai_chars if has_external else None,
+            )
         except Exception as e:
             _debug(game_id, f"❌ 大纲生成失败: {e}")
             raise
         _debug(game_id, f"✅ 大纲生成完成: {script.title}")
+
+        # Add filler characters to session if needed
+        if filler_chars:
+            session.characters.extend(filler_chars)
+            names = ", ".join(c.name for c in filler_chars)
+            _debug(game_id, f"➕ 补充{len(filler_chars)}个AI角色: {names}")
+
         session.script = script
         session.phase = GamePhase.ROLE_ASSIGN
         return session

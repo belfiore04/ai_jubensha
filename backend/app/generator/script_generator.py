@@ -9,6 +9,7 @@ from langfuse import observe
 from app.llm.adapter import LLMAdapter, get_llm
 from app.models.game import (
     Act,
+    Character,
     ChoiceOption,
     ChoiceQuestion,
     Clue,
@@ -93,13 +94,42 @@ OUTLINE_SYSTEM = """\
 """
 
 
-def _outline_user_prompt(style: ScriptStyle) -> str:
+def _outline_user_prompt(
+    style: ScriptStyle,
+    characters: list[Character] | None = None,
+) -> str:
     label = STYLE_LABELS[style]
+
+    # ── character personality section ──
+    char_section = ""
+    filler_count = 0
+    if characters:
+        char_descs = "\n".join(f"- {c.name}：{c.personality}" for c in characters if c.personality)
+        if char_descs:
+            char_section = f"""
+【参与角色的人设】
+以下AI角色将参与游戏，请让生成的剧本角色与这些人设产生关联——角色的性格特点、行为动机、说话方式等应与对应人设有呼应：
+{char_descs}
+"""
+        filler_count = max(0, 3 - len(characters))
+
+    filler_instruction = ""
+    filler_schema = ""
+    if filler_count > 0:
+        filler_instruction = f"\n还需要补充{filler_count}个AI角色，请在JSON中额外生成 filler_characters 数组，为补位角色创造与剧本世界观协调的名字和人设。\n"
+        examples = ',\n    '.join(
+            ['{{"name": "补位角色名", "personality": "一句话人设描述"}}'] * filler_count
+        )
+        filler_schema = f""",
+  "filler_characters": [
+    {examples}
+  ]"""
+
     return f"""\
 请为以下设定创作一个剧本杀大纲。
 
 【风格】{label}
-
+{char_section}{filler_instruction}
 请生成4个原创的剧本角色，每个角色都有独特的名字和身份，名字应符合故事世界观。
 注意：不要使用张山、酷鹅、胡一菲、豆几这些名字，请创造全新的角色名。
 
@@ -117,7 +147,7 @@ def _outline_user_prompt(style: ScriptStyle) -> str:
       "clues": ["线索1（一句话）", "线索2（一句话）"],
       "goal": "该角色在讨论中的隐藏目标（1句话，如'引导众人怀疑X'或'保护自己的不在场证明'）"
     }}
-  ]
+  ]{filler_schema}
 }}
 注意：roles数组中恰好有4个角色，且恰好有1个alignment为"murderer"。
 """
@@ -127,10 +157,17 @@ def _outline_user_prompt(style: ScriptStyle) -> str:
 async def generate_outline(
     style: ScriptStyle,
     llm: LLMAdapter | None = None,
-) -> Script:
-    """Generate the script outline (title, prologue, roles, truth)."""
+    characters: list[Character] | None = None,
+) -> tuple[Script, list[Character]]:
+    """Generate the script outline (title, prologue, roles, truth).
+
+    Returns (script, filler_characters) where filler_characters is empty
+    when no fillers are needed.
+    """
     if llm is None:
         llm = get_llm()
+
+    filler_needed = max(0, 3 - len(characters)) if characters else 0
 
     data: dict[str, Any] = {}
     last_err: Exception | None = None
@@ -138,7 +175,7 @@ async def generate_outline(
         try:
             raw = await llm.generate(
                 system_prompt=OUTLINE_SYSTEM,
-                user_prompt=_outline_user_prompt(style),
+                user_prompt=_outline_user_prompt(style, characters),
                 json_mode=True,
                 max_tokens=8192,
                 log_name="generate_outline",
@@ -195,7 +232,25 @@ async def generate_outline(
         truth=data.get("truth", ""),
         murderer_role_id=murderer_role_id,
     )
-    return script
+
+    # Parse filler characters from LLM response
+    filler_chars: list[Character] = []
+    for fc in data.get("filler_characters", []):
+        filler_chars.append(Character(
+            id=f"filler-{uid()}",
+            name=fc.get("name", "未命名"),
+            personality=fc.get("personality", ""),
+        ))
+    # Fallback: if LLM didn't generate enough fillers, create simple ones
+    while len(filler_chars) < filler_needed:
+        idx = len(filler_chars)
+        filler_chars.append(Character(
+            id=f"filler-{uid()}",
+            name=f"路人{chr(0x7532 + idx)}",  # 路人甲, 路人乙, ...
+            personality="神秘的陌生人",
+        ))
+
+    return script, filler_chars
 
 
 # ── act generation ─────────────────────────────────────

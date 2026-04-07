@@ -141,7 +141,7 @@ async def test_3_script_generation_with_goals():
     print("\n── Test 3: Script generation with goals ──")
     llm = LLMAdapter()
     try:
-        script = await generate_outline(ScriptStyle.DETECTIVE, llm=llm)
+        script, _ = await generate_outline(ScriptStyle.DETECTIVE, llm=llm)
         assert len(script.roles) == 4, f"Expected 4 roles, got {len(script.roles)}"
         goals_found = sum(1 for r in script.roles if r.goal)
         notes = f"title='{script.title}', goals: {goals_found}/4"

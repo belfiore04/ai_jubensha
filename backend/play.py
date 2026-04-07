@@ -88,7 +88,7 @@ async def main():
     logger.section("生成剧本大纲")
     logger.system(f"风格: {STYLE_LABELS[style]}，正在生成...")
     try:
-        script = await generate_outline(style, llm=llm)
+        script, _ = await generate_outline(style, llm=llm)
     except Exception as e:
         logger.error(e, "大纲生成失败")
         return
