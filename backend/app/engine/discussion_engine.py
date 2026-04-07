@@ -10,11 +10,13 @@ others' messages = user with <msg from="name"> wrapping.
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
 from typing import Callable, Awaitable
 
 from langfuse import observe
+from openai import AsyncOpenAI
 
 from app.llm.adapter import LLMAdapter
 from app.models.game import (
@@ -29,6 +31,27 @@ from app.models.game import (
 )
 
 MAX_AI_ROUNDS = 10  # safety valve, not a real limit
+
+# ── Discussion LLM config (DeepSeek for chat, qwen-turbo for selector) ──
+# Falls back to the default LLM_* config if DISC_* env vars are not set.
+
+def _disc_chat_client() -> tuple[AsyncOpenAI, str]:
+    """Client + model for character dialogue (DeepSeek by default)."""
+    api_key = os.getenv("DISC_CHAT_API_KEY", os.getenv("ROLEPLAY_CHAT_API_KEY", ""))
+    base_url = os.getenv("DISC_CHAT_BASE_URL", os.getenv("ROLEPLAY_CHAT_BASE_URL", ""))
+    model = os.getenv("DISC_CHAT_MODEL", os.getenv("ROLEPLAY_CHAT_MODEL", ""))
+    if api_key and base_url and model:
+        return AsyncOpenAI(api_key=api_key, base_url=base_url), model
+    return None, ""  # type: ignore[return-value]
+
+def _disc_selector_client() -> tuple[AsyncOpenAI, str]:
+    """Client + model for responder selection (qwen-turbo by default)."""
+    api_key = os.getenv("DISC_SELECTOR_API_KEY", os.getenv("ROLEPLAY_CHAT_API_KEY", ""))
+    base_url = os.getenv("DISC_SELECTOR_BASE_URL", os.getenv("ROLEPLAY_CHAT_BASE_URL", ""))
+    model = os.getenv("DISC_SELECTOR_MODEL", os.getenv("GROUP_CHAT_SELECTOR_MODEL", "qwen-turbo"))
+    if api_key and base_url:
+        return AsyncOpenAI(api_key=api_key, base_url=base_url), model
+    return None, ""  # type: ignore[return-value]
 
 
 def _clean_response(text: str) -> str:
@@ -79,6 +102,19 @@ class DiscussionEngine:
         self.player_character_id = player_character_id
         self.llm = llm
         self.script_context = script_context
+
+        # Discussion-specific LLM clients (DeepSeek / qwen-turbo)
+        self._chat_client, self._chat_model = _disc_chat_client()
+        self._selector_client, self._selector_model = _disc_selector_client()
+
+        if self._chat_client:
+            print(f"[Discussion] 对话模型: {self._chat_model}")
+        else:
+            print(f"[Discussion] 对话模型: {llm.model} (默认)")
+        if self._selector_client:
+            print(f"[Discussion] 选人模型: {self._selector_model}")
+        else:
+            print(f"[Discussion] 选人模型: {llm.model} (默认)")
 
         # Build lookup tables
         self._char_by_id = {c.id: c for c in characters}
@@ -255,6 +291,8 @@ class DiscussionEngine:
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=100,
                     temperature=0.2,
+                    client=self._selector_client,
+                    model=self._selector_model or None,
                 )
                 if not raw or not raw.strip():
                     if attempt == 0:
@@ -311,6 +349,8 @@ class DiscussionEngine:
                 messages=messages,
                 max_tokens=200,
                 temperature=0.8,
+                client=self._chat_client,
+                model=self._chat_model or None,
             )
             all_names = [self._role_name(cid) for cid in self.ai_char_ids]
             player_role = self._get_role(self.player_character_id)

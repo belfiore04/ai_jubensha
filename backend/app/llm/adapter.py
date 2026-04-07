@@ -102,11 +102,20 @@ class LLMAdapter:
         messages: list[dict[str, str]],
         max_tokens: int | None = None,
         temperature: float | None = None,
+        client: AsyncOpenAI | None = None,
+        model: str | None = None,
     ) -> str:
-        """Multi-message chat completion (for discussion engine)."""
+        """Multi-message chat completion.
+
+        Args:
+            client/model: Override the default client/model for this call.
+                          Used by discussion engine to route to different LLMs.
+        """
+        use_client = client or self.client
+        use_model = model or self.model
         try:
-            resp = await self.client.chat.completions.create(
-                model=self.model,
+            resp = await use_client.chat.completions.create(
+                model=use_model,
                 messages=messages,
                 max_tokens=max_tokens or self.max_tokens,
                 temperature=temperature if temperature is not None else self.temperature,
