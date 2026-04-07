@@ -79,38 +79,21 @@ export default function GameRoomPage() {
   useEffect(() => {
     if (!gameId) return;
 
+    // Merge messages from API into buffer
+    function mergeMessages(msgs: ChatMessage[]) {
+      setMessageBuffer((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id));
+        const newMsgs = msgs.filter((m) => !existingIds.has(m.id));
+        return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
+      });
+    }
+
     async function fetchAndStart() {
       try {
         dispatch({ type: "SET_LOADING", payload: true });
         const sess = await getGame(gameId!);
         dispatch({ type: "SET_SESSION", payload: sess });
-
-        if (sess.messages?.length) {
-          setMessageBuffer((prev) => {
-            const existingIds = new Set(prev.map((m) => m.id));
-            const newMsgs = sess.messages.filter((m: ChatMessage) => !existingIds.has(m.id));
-            return [...prev, ...newMsgs];
-          });
-        }
-
-        // If no messages yet (start_game still running), poll until they arrive
-        if (!sess.messages?.length) {
-          const poll = setInterval(async () => {
-            try {
-              const s = await getGame(gameId!);
-              if (s.messages?.length) {
-                setMessageBuffer((prev) => {
-                  const existingIds = new Set(prev.map((m) => m.id));
-                  const newMsgs = s.messages.filter((m: ChatMessage) => !existingIds.has(m.id));
-                  return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
-                });
-                dispatch({ type: "SET_SESSION", payload: s });
-                clearInterval(poll);
-              }
-            } catch { /* ignore */ }
-          }, 3000);
-          setTimeout(() => clearInterval(poll), 120000);
-        }
+        if (sess.messages?.length) mergeMessages(sess.messages);
       } catch (err) {
         dispatch({
           type: "SET_ERROR",
@@ -120,6 +103,19 @@ export default function GameRoomPage() {
     }
 
     fetchAndStart();
+
+    // Keep polling as SSE fallback — stops when game reaches ending
+    const poll = setInterval(async () => {
+      try {
+        const s = await getGame(gameId!);
+        dispatch({ type: "SET_SESSION", payload: s });
+        if (s.messages?.length) mergeMessages(s.messages);
+        if (s.phase === "ending") clearInterval(poll);
+      } catch { /* ignore */ }
+    }, 3000);
+    const timeout = setTimeout(() => clearInterval(poll), 600000);
+
+    return () => { clearInterval(poll); clearTimeout(timeout); };
   }, [gameId, dispatch]);
 
   // ── SSE stream ────────────────────────────────────
