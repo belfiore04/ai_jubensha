@@ -44,10 +44,14 @@ def _clean_response(text: str) -> str:
 
 def _post_process_reply(reply: str, char_name: str, all_names: list[str]) -> str:
     """Remove name prefixes, leaked <msg> tags, action descriptions."""
+    # Only strip self name prefix at the start of the reply
     reply = re.sub(r'^\[?' + re.escape(char_name) + r'\]?\s*[:：]\s*', '', reply)
+    # Remove leaked <msg> tags (AI speaking as another character)
     for name in all_names:
-        reply = re.sub(r'\[' + re.escape(name) + r'\]\s*[:：].*', '', reply)
         reply = re.sub(r'<msg\s+from="' + re.escape(name) + r'">.*?</msg>', '', reply, flags=re.DOTALL)
+    # Only strip other character name prefixes at line start (not mid-sentence)
+    for name in all_names:
+        reply = re.sub(r'^\[' + re.escape(name) + r'\]\s*[:：]\s*', '', reply, flags=re.MULTILINE)
     reply = _clean_response(reply)
     return reply.strip()
 
@@ -218,7 +222,10 @@ class DiscussionEngine:
                 "闲聊接茬、重复附和不算。大部分情况应该返回 []。"
             )
 
-        prompt = f"""你是剧本杀讨论环节的消息路由器。根据最新消息和上下文，判断哪些角色应该回复。
+        available_names = [self._role_name(cid) for cid in available]
+        names_str = "、".join(available_names)
+
+        prompt = f"""根据对话上下文，从可选角色中选出应该回复的角色。直接返回JSON数组。
 
 可选角色：
 {chr(10).join(char_descs)}
@@ -228,15 +235,11 @@ class DiscussionEngine:
 
 最新消息来自「{trigger_sender}」: {trigger_message}
 
-规则：
-1. 消息跟某个角色直接相关时，该角色应回复
-2. 一般选 1-2 个最合适的角色
-3. 不要每次都让所有人回复
-4. 【重要】如果对话已经自然结束、或没有角色有话要说，返回空数组 []
-5. 优先让和话题相关的角色回复{ai_round_rule}
+规则：选1-2个最相关的角色回复。对话自然结束则返回[]。{ai_round_rule}
 
-返回 JSON 数组，只包含角色名。例如: ["角色A"] 或 ["角色A", "角色B"] 或 []
-只返回 JSON，不要其他内容。"""
+示例输出: ["{available_names[0]}"] 或 ["{available_names[0]}", "{available_names[-1]}"] 或 []
+
+请直接输出JSON数组，不要输出任何其他文字："""
 
         # Map role names -> character ids (used after LLM response)
         role_to_char = {}

@@ -203,9 +203,9 @@ async def main():
 
         def get_player_disc_input() -> str:
             print()
-            text = input_text(f"  {C.WHITE}{C.BOLD}> {C.RESET}")
+            text = input_text(f"  {C.YELLOW}{C.BOLD}你({player_role.name})> {C.RESET}")
             if text:
-                logger.player_speak(player_char.name, player_role.name, text)
+                logger.event("player_discuss", content=text)
             else:
                 logger.system("讨论结束，进入选择题。")
             return text

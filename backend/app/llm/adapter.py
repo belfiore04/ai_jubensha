@@ -112,7 +112,11 @@ class LLMAdapter:
                 temperature=temperature if temperature is not None else self.temperature,
             )
             raw = resp.choices[0].message.content or ""
-            return _strip_thinking(raw)
+            result = _strip_thinking(raw)
+            # If strip_thinking removed everything, fall back to raw
+            if not result.strip() and raw.strip():
+                result = raw.strip()
+            return result
         except Exception:
             raise
 
