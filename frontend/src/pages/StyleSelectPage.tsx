@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useGame } from "../hooks/useGameStore";
 import { STYLES } from "../data";
 import { createGame, setStyle } from "../api";
@@ -8,7 +9,16 @@ import "./StyleSelectPage.css";
 
 export default function StyleSelectPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { state, dispatch } = useGame();
+
+  // Accept gameId from URL (passed by external platforms like memory)
+  useEffect(() => {
+    const urlGameId = searchParams.get("gameId");
+    if (urlGameId && !state.gameId) {
+      dispatch({ type: "SET_GAME_ID", payload: urlGameId });
+    }
+  }, [searchParams, state.gameId, dispatch]);
 
   async function handleSelect(style: ScriptStyle) {
     try {

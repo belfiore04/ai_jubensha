@@ -19,6 +19,7 @@ export default function App() {
       <BrowserRouter>
         <div className="app-shell">
           <Routes>
+            <Route path="/" element={<StyleSelectPage />} />
             <Route path="/style" element={<StyleSelectPage />} />
             <Route path="/roles" element={<RoleSelectPage />} />
             <Route path="/game/:id" element={<GameRoomPage />} />
