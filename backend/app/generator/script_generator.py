@@ -233,9 +233,11 @@ async def generate_outline(
         murderer_role_id=murderer_role_id,
     )
 
-    # Parse filler characters from LLM response
+    # Parse filler characters from LLM response (cap at filler_needed)
     filler_chars: list[Character] = []
     for fc in data.get("filler_characters", []):
+        if len(filler_chars) >= filler_needed:
+            break
         filler_chars.append(Character(
             id=f"filler-{uid()}",
             name=fc.get("name", "未命名"),
