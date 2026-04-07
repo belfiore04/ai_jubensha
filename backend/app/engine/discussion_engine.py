@@ -196,6 +196,7 @@ class DiscussionEngine:
 5. 【重要】不要加前缀如 [{role.name}]: 或 <msg> 标签，直接输出纯文本
 6. 【禁止】不要用括号描述动作，用语言表达情绪
 7. 围绕你的隐藏目标行动，但不要直白地暴露目标本身
+8. 每次发言必须带来新信息、新疑问或新观点。不要重复你或别人已经说过的话，哪怕换个说法也不行
 </严格规则>"""
 
     # ── Context isolation ────────────────────────────────
@@ -205,13 +206,29 @@ class DiscussionEngine:
     ) -> list[dict[str, str]]:
         """Build message list with context isolation.
 
-        Own messages -> role=assistant
+        Own recent messages (last 3) -> role=assistant
+        Own older messages -> role=user with <msg from="你之前说"> wrapping
+            (preserves awareness without creating assistant pattern echo)
         Others' messages -> role=user with <msg from="name"> wrapping
         """
+        recent = history[-20:]  # keep recent context manageable
+
+        # Find this character's messages and keep only last 3 as assistant
+        own_indices = [i for i, m in enumerate(recent) if m.sender_id == character_id]
+        own_as_assistant = set(own_indices[-3:]) if len(own_indices) > 3 else set(own_indices)
+
         result: list[dict[str, str]] = []
-        for msg in history[-20:]:  # keep recent context manageable
+        for i, msg in enumerate(recent):
             if msg.sender_id == character_id:
-                result.append({"role": "assistant", "content": msg.content})
+                if i in own_as_assistant:
+                    result.append({"role": "assistant", "content": msg.content})
+                else:
+                    # Older own messages: convert to user role so model
+                    # knows what it said but won't echo the pattern
+                    result.append({
+                        "role": "user",
+                        "content": f'<msg from="你之前说">{msg.content}</msg>',
+                    })
             else:
                 sender = msg.sender_name or msg.sender_id
                 result.append({
