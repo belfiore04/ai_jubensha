@@ -9,14 +9,14 @@ import StyleSelectPage from "./pages/StyleSelectPage";
 import RoleSelectPage from "./pages/RoleSelectPage";
 import GameRoomPage from "./pages/GameRoomPage";
 import EndingPage from "./pages/EndingPage";
-import DebugPanel from "./components/DebugPanel";
+// import DebugPanel from "./components/DebugPanel";
 
 export default function App() {
   const [state, dispatch] = useReducer(gameReducer, initialGameState);
 
   return (
     <GameContext.Provider value={{ state, dispatch }}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <div className="app-shell">
           <Routes>
             <Route path="/" element={<StyleSelectPage />} />
@@ -26,7 +26,7 @@ export default function App() {
             <Route path="/ending" element={<EndingPage />} />
             <Route path="*" element={<Navigate to="/style" replace />} />
           </Routes>
-          <DebugPanel gameId={state.gameId} />
+          {/* <DebugPanel gameId={state.gameId} /> */}
         </div>
       </BrowserRouter>
     </GameContext.Provider>

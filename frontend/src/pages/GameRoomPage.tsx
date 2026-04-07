@@ -191,7 +191,7 @@ export default function GameRoomPage() {
 
   // ── BGM ───────────────────────────────────────────
   useEffect(() => {
-    audioRef.current = new Audio("/bgm.mp3");
+    audioRef.current = new Audio(`${import.meta.env.BASE_URL}bgm.mp3`);
     audioRef.current.loop = true;
     audioRef.current.volume = 0.3;
     return () => {
@@ -290,11 +290,9 @@ export default function GameRoomPage() {
     visibleMessages.some(
       (m) => m.type === "dm_narration" && m.content.includes("选出凶手")
     );
-  // Note: isGenerating is NOT used for input disabled state.
-  // During generation, LoadingOverlay blocks the UI. After generation,
-  // session.phase can be stale (fetched once, never refreshed).
-  // isThinking (managed by SSE) is the reliable signal.
-  const isGenerating = phase === "generating";
+  // isGenerating: only used for reference, NOT for disabling input.
+  // session.phase can be stale; isThinking (SSE) is the reliable signal.
+  const _isGenerating = phase === "generating"; void _isGenerating;
 
   // Discussion mode: active between "自由讨论开始" and first choice message
   const isDiscussing = (() => {

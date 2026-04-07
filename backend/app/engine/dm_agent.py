@@ -171,6 +171,12 @@ AI角色：{', '.join(ai_names)}
             if r.id == session.script.murderer_role_id:
                 murderer_name = r.name
 
+        # Scoring: +40 for correct vote, -40 for wrong
+        if correct:
+            session.score += 40
+        else:
+            session.score = max(0, session.score - 40)
+
         messages: list[ChatMessage] = []
         if correct:
             messages.append(_msg(f"🎉 正确！{voted_name}就是凶手！"))

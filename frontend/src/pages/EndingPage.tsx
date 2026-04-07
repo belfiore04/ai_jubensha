@@ -66,6 +66,13 @@ export default function EndingPage() {
         <button className="replay-btn" onClick={handleReplay}>
           再来一局
         </button>
+
+        <button
+          className="home-btn"
+          onClick={() => window.location.href = '/'}
+        >
+          返回主页
+        </button>
       </div>
     </div>
   );

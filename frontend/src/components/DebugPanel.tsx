@@ -11,9 +11,11 @@ interface DebugPanelProps {
   apiBase?: string;
 }
 
+const DEFAULT_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+
 export default function DebugPanel({
   gameId,
-  apiBase = "http://localhost:8000",
+  apiBase = DEFAULT_BASE,
 }: DebugPanelProps) {
   const [logs, setLogs] = useState<DebugEntry[]>([]);
   const [collapsed, setCollapsed] = useState(false);

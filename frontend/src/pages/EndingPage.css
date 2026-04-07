@@ -115,3 +115,21 @@
   transform: translateY(-2px);
   box-shadow: 0 6px 24px var(--green-glow);
 }
+
+/* ── Home button ─────────────────────────────────── */
+
+.home-btn {
+  padding: 12px 48px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  transition: transform var(--transition), color var(--transition);
+}
+
+.home-btn:hover {
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
