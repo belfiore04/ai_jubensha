@@ -275,6 +275,8 @@ class DiscussionEngine:
                 if not selected and not is_ai_round:
                     selected = [random.choice(available)]
 
+                selected_names = [self._role_name(cid) for cid in selected]
+                print(f"[Discussion] 选中: {selected_names}")
                 return selected
 
             except Exception as e:
@@ -318,6 +320,45 @@ class DiscussionEngine:
         except Exception as e:
             print(f"[Discussion] 回复生成失败 ({char.name}): {e}")
             return "……"
+
+    # ── Initial round: all AI characters speak ─────────
+
+    async def _all_ai_speak(
+        self,
+        history: list[ChatMessage],
+        on_message: Callable[[str, str, str], Awaitable[None] | None],
+    ) -> None:
+        """Every AI character speaks once, sequentially (for opening round).
+
+        Each character can see what previous characters said.
+        Order is shuffled to avoid always the same person going first.
+        """
+        order = list(self.ai_char_ids)
+        random.shuffle(order)
+
+        for cid in order:
+            reply = await self._generate_reply(cid, history)
+            if not reply or reply == "……":
+                continue
+
+            role = self._get_role(cid)
+            char = self._get_char(cid)
+            role_name = role.name if role else "?"
+            char_name = char.name if char else "?"
+
+            msg = ChatMessage(
+                id=uid(),
+                type=MessageType.CHARACTER_SPEAK,
+                sender_id=cid,
+                sender_name=f"{char_name}({role_name})",
+                content=reply,
+                timestamp=0,
+            )
+            history.append(msg)
+
+            result = on_message(char_name, role_name, reply)
+            if hasattr(result, '__await__'):
+                await result
 
     # ── Multi-round AI discussion ────────────────────────
 
@@ -427,18 +468,9 @@ class DiscussionEngine:
             )
             history.append(clue_msg)
 
-        # Initial AI round: triggered by clue discovery
-        initial_trigger = (
-            clue_text if clues
-            else "讨论开始，请各位发表看法。"
-        )
-
-        await self._ai_multi_round(
-            history,
-            trigger_sender="系统",
-            trigger_message=initial_trigger,
-            on_message=on_message,
-        )
+        # Initial round: ALL AI characters speak once (no selector)
+        print("[Discussion] 初始轮：全员发言")
+        await self._all_ai_speak(history, on_message)
 
         # Player input loop
         while True:
