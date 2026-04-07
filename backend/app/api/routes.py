@@ -28,9 +28,21 @@ class SetStyleRequest(BaseModel):
     style: ScriptStyle
 
 
+class CharacterInput(BaseModel):
+    id: str
+    name: str
+    avatar: str = ""
+    personality: str = ""
+
+
+class CreateGameRequest(BaseModel):
+    ai_characters: list[CharacterInput] = []  # 3 AI characters from memory platform
+    player_name: str = "玩家"
+    player_avatar: str = ""
+
+
 class StartGameRequest(BaseModel):
     player_role_id: str
-    player_character_id: str
 
 
 class PlayerActionRequest(BaseModel):
@@ -55,9 +67,18 @@ async def list_styles():
 
 
 @router.post("/game", response_model=GameSession)
-async def create_game():
-    """Create a new game session."""
-    return engine.create_game()
+async def create_game(req: CreateGameRequest = CreateGameRequest()):
+    """Create a new game session with optional external characters."""
+    from app.models.game import Character
+    ai_chars = [
+        Character(id=c.id, name=c.name, avatar=c.avatar, personality=c.personality)
+        for c in req.ai_characters
+    ] if req.ai_characters else None
+    return engine.create_game(
+        ai_characters=ai_chars,
+        player_name=req.player_name,
+        player_avatar=req.player_avatar,
+    )
 
 
 @router.get("/game/{game_id}", response_model=GameSession)
@@ -83,7 +104,7 @@ async def start_game(game_id: str, req: StartGameRequest):
     """Player picks a role, characters are assigned, and the game begins."""
     try:
         messages = await engine.start_game(
-            game_id, req.player_role_id, req.player_character_id
+            game_id, req.player_role_id
         )
         return {"messages": [m.model_dump() for m in messages]}
     except ValueError as e:

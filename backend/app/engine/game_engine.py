@@ -165,9 +165,32 @@ class GameEngine:
 
     # ── lifecycle ──────────────────────────────────────
 
-    def create_game(self) -> GameSession:
+    def create_game(
+        self,
+        ai_characters: list[Character] | None = None,
+        player_name: str = "玩家",
+        player_avatar: str = "",
+    ) -> GameSession:
         gid = uid() + uid()
         session = GameSession(id=gid)
+
+        # Build player character
+        player_char = Character(
+            id="player",
+            name=player_name,
+            avatar=player_avatar,
+            personality="",
+            description="玩家",
+        )
+
+        # Use provided AI characters or fall back to platform defaults
+        ai_chars = ai_characters if ai_characters else list(PLATFORM_CHARACTERS)
+        # Ensure exactly 3 AI characters
+        ai_chars = ai_chars[:3]
+
+        session.characters = [player_char] + ai_chars
+        session.player_character_id = player_char.id
+
         _store[gid] = session
         _message_queues[gid] = asyncio.Queue()
         _debug_queues[gid] = asyncio.Queue()
@@ -192,50 +215,34 @@ class GameEngine:
         return session
 
     async def start_game(
-        self, game_id: str, player_role_id: str, player_character_id: str
+        self, game_id: str, player_role_id: str
     ) -> list[ChatMessage]:
         session = self._get(game_id)
         if not session.script:
             raise ValueError("Script not generated yet")
+        if len(session.characters) < 4:
+            raise ValueError("Need at least 4 characters (set in create_game)")
 
-        # Assign the 4 fixed platform characters to the 4 roles randomly
-        characters = list(PLATFORM_CHARACTERS)
         roles = list(session.script.roles)
+        player_character_id = session.player_character_id
 
         # Validate: player cannot pick the murderer role
         from app.models.game import RoleAlignment
-        player_role = None
-        for r in roles:
-            if r.id == player_role_id:
-                player_role = r
-                break
+        player_role = next((r for r in roles if r.id == player_role_id), None)
         if player_role and player_role.alignment == RoleAlignment.MURDERER:
-            # Silently reassign to first innocent role instead
-            for r in roles:
-                if r.alignment == RoleAlignment.INNOCENT:
-                    player_role_id = r.id
-                    break
+            player_role_id = next(
+                r.id for r in roles if r.alignment == RoleAlignment.INNOCENT
+            )
 
-        # Pull out the player's chosen character and role
-        player_char = None
-        for c in characters:
-            if c.id == player_character_id:
-                player_char = c
-                break
-        if not player_char:
-            raise ValueError(f"Character {player_character_id} not found")
-
-        # remaining characters and roles
-        remaining_chars = [c for c in characters if c.id != player_character_id]
+        # AI characters = everyone except the player
+        ai_chars = [c for c in session.characters if c.id != player_character_id]
         remaining_roles = [r for r in roles if r.id != player_role_id]
 
-        if len(remaining_chars) != 3 or len(remaining_roles) != 3:
-            raise ValueError("Need exactly 4 characters and 4 roles")
+        if len(ai_chars) < 3 or len(remaining_roles) != 3:
+            raise ValueError("Need exactly 3 AI characters and 3 remaining roles")
 
-        # shuffle remaining characters to assign to remaining roles randomly
-        random.shuffle(remaining_chars)
+        random.shuffle(ai_chars)
 
-        # build mappings
         mappings: list[CharacterRoleMapping] = [
             CharacterRoleMapping(
                 character_id=player_character_id,
@@ -246,15 +253,13 @@ class GameEngine:
         for i, role in enumerate(remaining_roles):
             mappings.append(
                 CharacterRoleMapping(
-                    character_id=remaining_chars[i].id,
+                    character_id=ai_chars[i].id,
                     role_id=role.id,
                     is_player=False,
                 )
             )
 
-        session.characters = characters
         session.mappings = mappings
-        session.player_character_id = player_character_id
 
         session.phase = GamePhase.GENERATING
         _debug(game_id, "🎮 游戏启动，分配角色完成")

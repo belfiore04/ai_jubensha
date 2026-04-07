@@ -17,8 +17,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 /* ── Game lifecycle ───────────────────────────────── */
 
-export function createGame(): Promise<GameSession> {
-  return request<GameSession>(`${API}/game`, { method: "POST" });
+export function createGame(opts?: {
+  ai_characters?: { id: string; name: string; avatar?: string; personality?: string }[];
+  player_name?: string;
+  player_avatar?: string;
+}): Promise<GameSession> {
+  return request<GameSession>(`${API}/game`, {
+    method: "POST",
+    body: JSON.stringify(opts ?? {}),
+  });
 }
 
 export function getGame(gameId: string): Promise<GameSession> {
@@ -38,13 +45,11 @@ export function setStyle(
 export function startGame(
   gameId: string,
   playerRoleId: string,
-  playerCharacterId: string
 ): Promise<{ messages: GameSession["messages"] }> {
   return request(`${API}/game/${gameId}/start`, {
     method: "POST",
     body: JSON.stringify({
       player_role_id: playerRoleId,
-      player_character_id: playerCharacterId,
     }),
   });
 }

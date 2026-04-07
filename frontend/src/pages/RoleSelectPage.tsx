@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGame } from "../hooks/useGameStore";
-import { PLATFORM_CHARACTERS } from "../data";
 import { startGame } from "../api";
 import Header from "../components/Header";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -17,15 +16,11 @@ export default function RoleSelectPage() {
   );
   const isGenerating = state.session?.phase === "generating";
 
-  // Pick a random default character for the player (first one)
-  const playerCharacterId = PLATFORM_CHARACTERS[0].id;
-
   function handleStart() {
     if (!selectedRoleId || !state.gameId) return;
 
     // Fire-and-forget: start game in background, navigate immediately
-    // GameRoom will pick up messages via SSE as they arrive
-    startGame(state.gameId, selectedRoleId, playerCharacterId).catch(() => {});
+    startGame(state.gameId, selectedRoleId).catch(() => {});
 
     navigate(`/game/${state.gameId}`);
   }
