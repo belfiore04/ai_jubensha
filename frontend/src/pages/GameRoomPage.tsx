@@ -145,7 +145,8 @@ export default function GameRoomPage() {
           // Refresh game state on phase-changing messages
           if (
             (msg.type === "dm_narration" && msg.content.includes("选出凶手")) ||
-            (msg.type === "system" && msg.content.includes("游戏结束"))
+            (msg.type === "system" && msg.content.includes("游戏结束")) ||
+            (msg.type === "system" && msg.content.includes("自由讨论开始"))
           ) {
             getGame(gameId).then((s) => dispatch({ type: "SET_SESSION", payload: s })).catch(() => {});
           }
