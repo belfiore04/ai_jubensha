@@ -35,6 +35,7 @@ export default function GameRoomPage() {
   const [isThinking, setIsThinking] = useState(false);
   const esRef = useRef<EventSource | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const msgCountRef = useRef(0);
 
   // ── Message pacing ──────────────────────────────────
   const [messageBuffer, setMessageBuffer] = useState<ChatMessage[]>([]);
@@ -93,7 +94,10 @@ export default function GameRoomPage() {
         dispatch({ type: "SET_LOADING", payload: true });
         const sess = await getGame(gameId!);
         dispatch({ type: "SET_SESSION", payload: sess });
-        if (sess.messages?.length) mergeMessages(sess.messages);
+        if (sess.messages?.length) {
+          mergeMessages(sess.messages);
+          msgCountRef.current = sess.messages.length;
+        }
       } catch (err) {
         dispatch({
           type: "SET_ERROR",
@@ -109,7 +113,14 @@ export default function GameRoomPage() {
       try {
         const s = await getGame(gameId!);
         dispatch({ type: "SET_SESSION", payload: s });
-        if (s.messages?.length) mergeMessages(s.messages);
+        if (s.messages?.length) {
+          mergeMessages(s.messages);
+          // Clear thinking when server has more messages than last poll (backend responded)
+          if (s.messages.length > msgCountRef.current) {
+            setIsThinking(false);
+          }
+          msgCountRef.current = s.messages.length;
+        }
         if (s.phase === "ending") clearInterval(poll);
       } catch { /* ignore */ }
     }, 3000);
