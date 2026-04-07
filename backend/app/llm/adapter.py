@@ -113,9 +113,8 @@ class LLMAdapter:
             )
             raw = resp.choices[0].message.content or ""
             result = _strip_thinking(raw)
-            # If strip_thinking removed everything, fall back to raw
             if not result.strip() and raw.strip():
-                result = raw.strip()
+                print(f"[LLM] generate_chat: think块之外无内容，返回空 (raw len={len(raw)})")
             return result
         except Exception:
             raise

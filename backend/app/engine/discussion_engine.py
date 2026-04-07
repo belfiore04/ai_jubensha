@@ -338,7 +338,12 @@ class DiscussionEngine:
 
         for cid in order:
             reply = await self._generate_reply(cid, history)
+            # Retry once if empty (model may return think-only response)
             if not reply or reply == "……":
+                print(f"[Discussion] {self._char_name(cid)} 首次回复为空，重试...")
+                reply = await self._generate_reply(cid, history)
+            if not reply or reply == "……":
+                print(f"[Discussion] {self._char_name(cid)} 重试仍为空，跳过")
                 continue
 
             role = self._get_role(cid)

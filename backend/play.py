@@ -203,7 +203,7 @@ async def main():
 
         def get_player_disc_input() -> str:
             print()
-            text = input_text(f"  {C.YELLOW}{C.BOLD}你({player_role.name})> {C.RESET}")
+            text = input_text(f"  {C.GOLD}{C.BOLD}你({player_role.name})> {C.RESET}")
             if text:
                 logger.event("player_discuss", content=text)
             else:
